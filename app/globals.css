@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #09090b; /* Slightly deeper black for OLED mobile screens */
+  --foreground: #ffffff;
+}
+
+@layer base {
+  html, body {
+    /* Prevents the 'rubber-band' bouncing effect on iOS */
+    overscroll-behavior-y: none;
+    /* Prevents the grey box flash when tapping buttons on mobile */
+    -webkit-tap-highlight-color: transparent;
+    background-color: var(--background);
+    color: var(--foreground);
+    /* Use dynamic viewport height to fix the mobile URL bar bug */
+    height: 100dvh;
+    width: 100vw;
+    overflow: hidden;
+  }
+}
+
+body {
+  /* Smoother, more modern radial glow */
+  background: radial-gradient(circle at 50% -20%, #1e1e2e 0%, #09090b 80%);
+}
+
+/* Glassmorphism Evolution */
+.glass-card {
+  background: rgba(24, 24, 27, 0.6);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+/* Updated Matching Animation */
+@keyframes pulse-blue {
+  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+  70% { box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
+.matching-active {
+  animation: pulse-blue 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Hide scrollbars for a clean app-like feel while keeping scroll functionality */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Utility for the Input area to stay above the mobile keyboard */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
