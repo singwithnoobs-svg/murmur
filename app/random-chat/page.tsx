@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, LogOut, RefreshCw, Zap, Loader2, Flag } from "lucide-react";
+import { Send, LogOut, RefreshCw, Zap, Loader2, Flag, X } from "lucide-react";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 function ChatContent() {
@@ -15,9 +15,15 @@ function ChatContent() {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [nickname, setNickname] = useState("");
+  const [myFingerprint, setMyFingerprint] = useState<string | null>(null);
   const [partnerNickname, setPartnerNickname] = useState<string | null>(null);
   const [partnerFingerprint, setPartnerFingerprint] = useState<string | null>(null);
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
+
+  // New Report States
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [customReason, setCustomReason] = useState("");
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
@@ -35,8 +41,10 @@ function ChatContent() {
     if (!roomid || !nickname) return;
 
     const setupChat = async () => {
-      const fp = await (await FingerprintJS.load()).get();
-      const myFingerprint = fp.visitorId;
+      const fpLoad = await FingerprintJS.load();
+      const result = await fpLoad.get();
+      const visitorId = result.visitorId;
+      setMyFingerprint(visitorId);
 
       const channel = supabase.channel(`room_${roomid}`, {
         config: { presence: { key: nickname } }
@@ -74,7 +82,7 @@ function ChatContent() {
           if (status === "SUBSCRIBED") {
             await channel.track({ 
               isTyping: false,
-              fp: myFingerprint,
+              fp: visitorId,
               online_at: new Date().toISOString() 
             });
           }
@@ -94,54 +102,122 @@ function ChatContent() {
       channelRef.current.track({
         isTyping: val.length > 0,
         online_at: new Date().toISOString(),
-        fp: partnerFingerprint // Keep sharing FP during track
+        fp: myFingerprint 
       });
     }
   };
 
-  const sendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !roomid) return;
-    const content = newMessage;
-    setNewMessage(""); 
-    if (channelRef.current) channelRef.current.track({ isTyping: false });
-    await supabase.from("messages").insert([{ room_id: roomid, nickname, content }]);
-  };
+const sendMessage = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!newMessage.trim() || !roomid) return;
 
-  const handleReport = async () => {
-    if (!roomid || !partnerNickname) return;
-    const confirmReport = confirm("Report this user?");
-    if (confirmReport) {
-      await supabase.from("reports").insert([{
-        reported_by: nickname,
-        reported_user: partnerNickname,
-        fingerprint: partnerFingerprint,
-        room_id: roomid,
-        chat_log: messages, 
-      }]);
-      alert("Reported. Skipping...");
-      handleSkip();
-    }
-  };
+  const content = newMessage;
+  setNewMessage(""); 
 
-  const handleSkip = async () => {
-    if (!roomid) return;
-    await supabase.from("rooms").delete().eq("id", roomid);
-    await supabase.from("messages").delete().eq("room_id", roomid);
+  if (channelRef.current) {
+    channelRef.current.track({ isTyping: false, fp: myFingerprint });
+  }
+
+  // FIRST: Verify the room exists to avoid foreign key crash
+  const { data: roomExists } = await supabase
+    .from("rooms")
+    .select("id")
+    .eq("id", roomid)
+    .single();
+
+  if (!roomExists) {
+    console.error("Room no longer exists. Partner probably skipped.");
     router.replace("/matching");
+    return;
+  }
+
+  // SECOND: Insert the message
+  const { error } = await supabase
+    .from("messages")
+    .insert([{ 
+      room_id: roomid, 
+      nickname: nickname, 
+      content: content 
+    }]);
+
+  if (error) {
+    console.error("SUPABASE ERROR:", error.message);
+  }
+};
+
+  const submitReport = async () => {
+    const finalReason = reportReason === "Other" ? customReason : reportReason;
+    if (!finalReason) return alert("Please select a reason.");
+
+    await supabase.from("reports").insert([{
+      reported_by: nickname,
+      reported_user: partnerNickname,
+      fingerprint: partnerFingerprint,
+      room_id: roomid,
+      chat_log: messages, 
+      reason: finalReason
+    }]);
+
+    alert("User reported. Skipping...");
+    setShowReportModal(false);
+    handleSkip();
+  };
+
+const handleSkip = async () => {
+    if (!roomid) return;
+    
+    // 1. Purge evidence from Supabase
+    await supabase.from("messages").delete().eq("room_id", roomid);
+    await supabase.from("rooms").delete().eq("id", roomid);
+    
+    // 2. Redirect back to the search/loading state
+    router.replace("/matching"); 
   };
 
   const handleExit = async () => {
-    if (roomid) await supabase.from("rooms").delete().eq("id", roomid);
-    router.push("/mode");
+    if (roomid) {
+      // 1. Purge evidence from Supabase
+      await supabase.from("messages").delete().eq("room_id", roomid);
+      await supabase.from("rooms").delete().eq("id", roomid);
+    }
+    
+    // 2. Clear temporary session and go back to the very beginning (Landing Page)
+    sessionStorage.removeItem("murmur_nickname");
+    router.push("/"); 
   };
-
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
   return (
     <div className="flex flex-col h-[100dvh] bg-zinc-950 text-zinc-100 overflow-hidden selection:bg-blue-500/30">
+      
+      {/* REPORT MODAL */}
+      <AnimatePresence>
+        {showReportModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl w-full max-w-sm shadow-2xl">
+              <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-red-500"><Flag className="w-5 h-5"/> Report User</h3>
+              <div className="space-y-3 mb-6">
+                {["Inappropriate Behavior", "Spamming", "Harassment", "Other"].map((r) => (
+                  <button key={r} onClick={() => setReportReason(r)} className={`w-full p-3 rounded-xl border text-xs font-bold transition-all uppercase tracking-widest ${reportReason === r ? "bg-red-600 border-red-500 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-400"}`}>
+                    {r}
+                  </button>
+                ))}
+                {reportReason === "Other" && (
+                  <textarea 
+                    value={customReason} 
+                    onChange={(e) => setCustomReason(e.target.value)}
+                    placeholder="Describe the issue..."
+                    className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-sm outline-none focus:border-red-500 text-white"
+                  />
+                )}
+              </div>
+              <div className="flex gap-3">
+                <button onClick={submitReport} className="flex-1 bg-white text-black py-3 rounded-xl font-black text-xs uppercase tracking-widest">SUBMIT</button>
+                <button onClick={() => setShowReportModal(false)} className="px-5 bg-zinc-800 py-3 rounded-xl font-bold text-sm text-zinc-400"><X className="w-4 h-4" /></button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* HEADER */}
       <header className="h-20 shrink-0 border-b border-zinc-800/50 bg-zinc-900/40 backdrop-blur-xl flex items-center justify-between px-4 md:px-8">
         <div className="flex items-center gap-3">
@@ -162,7 +238,7 @@ function ChatContent() {
         </div>
         
         <div className="flex items-center gap-2 md:gap-3">
-          <button onClick={handleReport} className="h-10 w-10 flex items-center justify-center rounded-xl border border-zinc-800 text-zinc-600 hover:text-red-500 transition-all"><Flag className="w-4 h-4" /></button>
+          <button onClick={() => setShowReportModal(true)} className="h-10 w-10 flex items-center justify-center rounded-xl border border-zinc-800 text-zinc-600 hover:text-red-500 transition-all"><Flag className="w-4 h-4" /></button>
           <button onClick={handleSkip} className="h-10 px-3 md:px-6 rounded-xl bg-white text-black text-xs font-black flex items-center gap-2 active:scale-95"><RefreshCw className="w-4 h-4" /> <span className="hidden md:block">SKIP</span></button>
           <button onClick={handleExit} className="h-10 w-10 flex items-center justify-center rounded-xl border border-zinc-800 text-zinc-500 active:scale-95"><LogOut className="w-4 h-4" /></button>
         </div>
