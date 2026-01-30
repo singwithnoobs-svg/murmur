@@ -51,7 +51,7 @@ const AdsterraBanner = memo(() => {
       <div className="relative rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900 shadow-2xl min-h-[250px] min-w-[300px] flex items-center justify-center group">
         <div ref={adRef} className="z-20 relative" />
         <a 
-          href="https://youtube.com/@yourchannel" // REPLACE WITH YOUR LINK
+          href="https://youtube.com/@cgvanish" // REPLACE WITH YOUR LINK
           target="_blank" 
           rel="noopener noreferrer"
           className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 text-center space-y-4 bg-zinc-900 hover:bg-zinc-800 transition-colors cursor-pointer"
