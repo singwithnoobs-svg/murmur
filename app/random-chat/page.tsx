@@ -4,19 +4,25 @@ import { useEffect, useState, useRef, Suspense, memo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, LogOut, RefreshCw, Zap, Loader2, Flag, X, Youtube } from "lucide-react";
+import { Send, LogOut, RefreshCw, Zap, Loader2, Flag, X } from "lucide-react";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
-/* AD COMPONENT: Wrapped in memo with Diagnostic Logs and Channel Fallback */
+/* AD COMPONENT: Optimized for Banner Display only.
+  Uses a ref-check to ensure scripts only load once per instance.
+*/
 const AdsterraBanner = memo(() => {
   const adRef = useRef<HTMLDivElement>(null);
+  const initialized = useRef(false);
 
   useEffect(() => {
-    if (adRef.current && !adRef.current.firstChild) {
-      console.log("[ADSTERRA] Initializing ad container...");
+    if (adRef.current && !initialized.current) {
+      initialized.current = true;
+      const container = adRef.current;
 
-      const configScript = document.createElement("script");
-      configScript.innerHTML = `
+      // 1. Create the Config Script
+      const config = document.createElement("script");
+      config.type = "text/javascript";
+      config.innerHTML = `
         atOptions = {
           'key' : 'fa3453ae0f13be3b5ba238031d224e99',
           'format' : 'iframe',
@@ -25,60 +31,33 @@ const AdsterraBanner = memo(() => {
           'params' : {}
         };
       `;
-      
-      const adScript = document.createElement("script");
-      adScript.type = "text/javascript";
-      adScript.src = "https://www.highperformanceformat.com/fa3453ae0f13be3b5ba238031d224e99/invoke.js";
 
-      adScript.onerror = () => console.error("[ADSTERRA] Script failed to load.");
-      adScript.onload = () => {
-        console.log("[ADSTERRA] Script injected. Checking delivery...");
-        setTimeout(() => {
-          const hasIframe = adRef.current?.querySelector('iframe');
-          if (hasIframe) console.log("[ADSTERRA] SUCCESS: Ad active.");
-          else console.warn("[ADSTERRA] WARNING: No ad fill. Showing fallback.");
-        }, 3000);
-      };
+      // 2. Create the Invoke Script
+      const invoke = document.createElement("script");
+      invoke.type = "text/javascript";
+      invoke.src = "//www.highperformanceformat.com/fa3453ae0f13be3b5ba238031d224e99/invoke.js";
 
-      adRef.current.appendChild(configScript);
-      adRef.current.appendChild(adScript);
+      // 3. Append to container
+      container.appendChild(config);
+      container.appendChild(invoke);
     }
   }, []);
 
   return (
-    <div className="flex flex-col items-center my-8 py-4 border-y border-zinc-900/50 bg-zinc-950/30">
-      <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.4em] mb-4">
-        — Sponsored Transmission —
+    <div className="flex flex-col items-center my-8 py-6 border-y border-zinc-900/50 bg-zinc-950/40 shadow-inner">
+      <span className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.4em] mb-4">
+        Sponsored Message
       </span>
       
-      <div className="relative rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900 shadow-2xl min-h-[250px] min-w-[300px] flex items-center justify-center group">
-        {/* 1. THE ACTUAL AD (Top Layer) */}
-        <div ref={adRef} className="z-20 relative" />
-
-        {/* 2. THE CHANNEL FALLBACK (Visible if ad is blank) */}
-        <a 
-          href="https://youtube.com/@cgvanish" // REPLACE WITH YOUR LINK
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 text-center space-y-4 bg-zinc-900 hover:bg-zinc-800 transition-colors cursor-pointer"
-        >
-          <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20 group-hover:scale-110 transition-transform duration-500">
-            <Youtube className="w-7 h-7 text-red-500" />
-          </div>
-          
-          <div className="space-y-2">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">
-              Signal Interrupted
-            </p>
-            <p className="text-xs text-white font-black uppercase tracking-widest bg-red-600 px-4 py-2 rounded-lg shadow-lg">
-              SUBSCRIBE TO CHANNEL
-            </p>
-            <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-tighter">
-              Bypass encryption to join the source
-            </p>
-          </div>
-        </a>
-      </div>
+      {/* Strict 300x250 Box */}
+      <div 
+        ref={adRef} 
+        className="rounded-xl overflow-hidden border border-zinc-800 bg-black min-h-[250px] min-w-[300px] flex items-center justify-center shadow-2xl"
+      />
+      
+      <p className="text-[8px] text-zinc-800 mt-3 font-bold uppercase tracking-tighter">
+        Secure Ad Link • Ghost Protocol Active
+      </p>
     </div>
   );
 });
@@ -99,7 +78,6 @@ function ChatContent() {
 
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState("");
-  const [customReason, setCustomReason] = useState("");
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
@@ -230,7 +208,6 @@ function ChatContent() {
   return (
     <div className="flex flex-col h-[100dvh] bg-zinc-950 text-zinc-100 overflow-hidden selection:bg-blue-500/30">
       
-      {/* REPORT MODAL */}
       <AnimatePresence>
         {showReportModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
