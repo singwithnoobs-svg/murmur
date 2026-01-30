@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import AdsterraBanner from "@/components/AdsterraBanner";
 import { Shield, Zap, Lock, RefreshCw, Hash, Users } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { cn } from "@/lib/utils";
@@ -14,7 +13,6 @@ import { cn } from "@/lib/utils";
 const prefixes = ["Neon","Void","Silent","Dark","Solar","Lunar","Ghost","Cyber","Static","Crimson","Quantum","Hidden","Obsidian","Frozen","Infinite","Echo","Nova","Shadow","Digital","Zero"];
 const cores = ["Phantom","Cipher","Oracle","Specter","Runner","Signal","Apex","Pulse","Drift","Vector","Nexus","Warp","Flux","Vortex","Kernel","Node","Logic","Protocol","Entity","Core"];
 const suffixes = ["Prime","Alpha","Omega","X","Z","Mk","EX","ULTRA","Void","One","Null","Origin","Edge"];
-/* ========================= */
 
 export default function LandingPage() {
   const [name, setName] = useState("");
@@ -27,22 +25,33 @@ export default function LandingPage() {
     const number = Math.floor(Math.random() * 100).toString().padStart(2,"0");
     const identity = `${p}${c}${s}${number}`;
     setName(identity);
+    // Persist to session so chat rooms can read it
     sessionStorage.setItem("murmur_nickname", identity);
   };
 
-  useEffect(() => { generateIdentity(); }, []);
+  useEffect(() => { 
+    generateIdentity(); 
+  }, []);
+
+  const handleNavigation = (path: string) => {
+    // Ensure nickname is saved one last time before moving
+    sessionStorage.setItem("murmur_nickname", name);
+    router.push(path);
+  };
 
   return (
-    <div className="min-h-[100dvh] bg-zinc-950 text-zinc-100 flex flex-col">
-
-      {/* Navbar */}
+    // REMOVED: overflow-hidden. ADDED: min-h-screen to allow content to expand.
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 selection:bg-purple-500/30 flex flex-col">
       <Navbar />
 
-      {/* Main content */}
-      <main className="flex-1 overflow-y-auto pt-32 pb-32 px-6 no-scrollbar">
+      {/* SCROLL FIX: 
+          1. Removed flex-1 overflow-y-auto from main.
+          2. Using standard padding and container flow.
+      */}
+      <main className="pt-32 pb-20 px-6">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
 
-          {/* LEFT SIDE */}
+          {/* LEFT SIDE: BRANDING */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -72,52 +81,51 @@ export default function LandingPage() {
             </div>
           </motion.div>
 
-          {/* RIGHT SIDE CARD */}
+          {/* RIGHT SIDE: IDENTITY CARD */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="relative"
           >
-            {/* Decorative gradient (clicks pass through) */}
             <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl blur opacity-20 pointer-events-none" />
 
             <div className="relative bg-zinc-900 border border-zinc-800 p-8 md:p-12 rounded-3xl shadow-2xl">
 
-              {/* Assigned Identity */}
+              {/* Identity Display */}
               <div className="mb-10">
                 <label className="text-[10px] uppercase tracking-[0.2em] font-black text-zinc-600 ml-1">
                   Assigned Identity
                 </label>
-                <div className="flex items-center gap-3 mt-2 bg-zinc-950 border border-zinc-800 p-5 rounded-2xl">
+                <div className="flex items-center gap-3 mt-2 bg-zinc-950 border border-zinc-800 p-5 rounded-2xl group">
                   <span className="text-xl md:text-2xl font-mono text-purple-400 font-bold flex-1 tracking-tight">
                     {name}
                   </span>
                   <button
                     onClick={generateIdentity}
-                    className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors"
+                    className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-500 transition-all active:rotate-180"
                   >
                     <RefreshCw className="w-5 h-5" />
                   </button>
                 </div>
               </div>
 
-              {/* Action Buttons */}
+              {/* Navigation Buttons */}
               <div className="space-y-4">
                 <button
-                  onClick={() => router.push("/matching")}
+                  onClick={() => handleNavigation("/matching")}
                   className={cn(
                     "w-full py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3",
-                    "bg-white text-black hover:bg-zinc-200 active:scale-95"
+                    "bg-white text-black hover:bg-zinc-200 active:scale-95 transition-all"
                   )}
                 >
                   <Hash className="w-4 h-4" /> Random Match
                 </button>
 
                 <button
-                  onClick={() => router.push("/lobby")}
+                  onClick={() => handleNavigation("/lobby")}
                   className={cn(
                     "w-full py-5 rounded-2xl font-black text-xs uppercase tracking-widest border flex items-center justify-center gap-3",
-                    "bg-zinc-900 border-zinc-800 text-white hover:bg-zinc-800 active:scale-95"
+                    "bg-zinc-900 border-zinc-800 text-white hover:bg-zinc-800 active:scale-95 transition-all"
                   )}
                 >
                   <Users className="w-4 h-4" /> Lobby / Private Room
@@ -126,17 +134,12 @@ export default function LandingPage() {
 
               <div className="mt-8 pt-6 border-t border-zinc-800/50 flex justify-between items-center text-[9px] text-zinc-600 font-bold uppercase tracking-[0.2em]">
                 <span>Status: Encrypted</span>
-                <span className="text-purple-900">v3.1.0</span>
+                <span className="text-purple-900/50">v3.1.0</span>
               </div>
             </div>
           </motion.div>
         </div>
       </main>
-
-      {/* Sticky Banner */}
-      <div className="sticky bottom-0 flex justify-center pb-6 z-10 bg-zinc-950">
-        <AdsterraBanner adKey="fa3453ae0f13be3b5ba238031d224e99" width={300} height={250} />
-      </div>
     </div>
   );
 }
