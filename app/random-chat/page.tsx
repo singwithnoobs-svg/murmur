@@ -15,6 +15,8 @@ const AdsterraBanner = memo(() => {
 
   useEffect(() => {
     if (adRef.current && !adRef.current.firstChild) {
+      console.log("[ADSTERRA] Initializing ad container...");
+
       const configScript = document.createElement("script");
       configScript.innerHTML = `
         atOptions = {
@@ -25,9 +27,26 @@ const AdsterraBanner = memo(() => {
           'params' : {}
         };
       `;
+      
       const adScript = document.createElement("script");
       adScript.type = "text/javascript";
       adScript.src = "https://www.highperformanceformat.com/fa3453ae0f13be3b5ba238031d224e99/invoke.js";
+
+      // Error Handling Log
+      adScript.onerror = () => console.error("[ADSTERRA] Script failed to load. Possible AdBlocker or Network issue.");
+      adScript.onload = () => {
+        console.log("[ADSTERRA] Script injected successfully. Waiting for ad delivery...");
+        
+        // Check if the ad actually rendered an iframe after 3 seconds
+        setTimeout(() => {
+          const hasIframe = adRef.current?.querySelector('iframe');
+          if (hasIframe) {
+            console.log("[ADSTERRA] SUCCESS: Ad iframe is visible and active.");
+          } else {
+            console.warn("[ADSTERRA] WARNING: Script loaded but no ad was filled. This is common for low-traffic or new sites.");
+          }
+        }, 3000);
+      };
 
       adRef.current.appendChild(configScript);
       adRef.current.appendChild(adScript);
