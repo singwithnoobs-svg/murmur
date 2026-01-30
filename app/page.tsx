@@ -7,9 +7,6 @@ import { Shield, Zap, Lock, RefreshCw, Hash, Users } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { cn } from "@/lib/utils";
 
-/* =========================
-   ADVANCED IDENTITY WORD BANK
-   ========================= */
 const prefixes = ["Neon","Void","Silent","Dark","Solar","Lunar","Ghost","Cyber","Static","Crimson","Quantum","Hidden","Obsidian","Frozen","Infinite","Echo","Nova","Shadow","Digital","Zero"];
 const cores = ["Phantom","Cipher","Oracle","Specter","Runner","Signal","Apex","Pulse","Drift","Vector","Nexus","Warp","Flux","Vortex","Kernel","Node","Logic","Protocol","Entity","Core"];
 const suffixes = ["Prime","Alpha","Omega","X","Z","Mk","EX","ULTRA","Void","One","Null","Origin","Edge"];
@@ -25,33 +22,22 @@ export default function LandingPage() {
     const number = Math.floor(Math.random() * 100).toString().padStart(2,"0");
     const identity = `${p}${c}${s}${number}`;
     setName(identity);
-    // Persist to session so chat rooms can read it
     sessionStorage.setItem("murmur_nickname", identity);
   };
 
-  useEffect(() => { 
-    generateIdentity(); 
-  }, []);
-
-  const handleNavigation = (path: string) => {
-    // Ensure nickname is saved one last time before moving
-    sessionStorage.setItem("murmur_nickname", name);
-    router.push(path);
-  };
+  useEffect(() => { generateIdentity(); }, []);
 
   return (
-    // REMOVED: overflow-hidden. ADDED: min-h-screen to allow content to expand.
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 selection:bg-purple-500/30 flex flex-col">
+    // FIX: Using h-screen and overflow-y-auto ensures the background color 
+    // covers the entire viewport regardless of content height.
+    <div className="h-screen w-full bg-zinc-950 text-zinc-100 selection:bg-purple-500/30 overflow-y-auto flex flex-col">
       <Navbar />
 
-      {/* SCROLL FIX: 
-          1. Removed flex-1 overflow-y-auto from main.
-          2. Using standard padding and container flow.
-      */}
-      <main className="pt-32 pb-20 px-6">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+      {/* FIX: Using items-center and justify-center to prevent the 'floating' effect at the top */}
+      <main className="flex-1 flex items-center justify-center py-20 px-6">
+        <div className="max-w-7xl w-full mx-auto grid lg:grid-cols-2 gap-16 items-center">
 
-          {/* LEFT SIDE: BRANDING */}
+          {/* LEFT SIDE */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -81,7 +67,7 @@ export default function LandingPage() {
             </div>
           </motion.div>
 
-          {/* RIGHT SIDE: IDENTITY CARD */}
+          {/* RIGHT SIDE CARD */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -90,8 +76,6 @@ export default function LandingPage() {
             <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl blur opacity-20 pointer-events-none" />
 
             <div className="relative bg-zinc-900 border border-zinc-800 p-8 md:p-12 rounded-3xl shadow-2xl">
-
-              {/* Identity Display */}
               <div className="mb-10">
                 <label className="text-[10px] uppercase tracking-[0.2em] font-black text-zinc-600 ml-1">
                   Assigned Identity
@@ -102,31 +86,24 @@ export default function LandingPage() {
                   </span>
                   <button
                     onClick={generateIdentity}
-                    className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-500 transition-all active:rotate-180"
+                    className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-500 transition-all active:rotate-180 duration-500"
                   >
                     <RefreshCw className="w-5 h-5" />
                   </button>
                 </div>
               </div>
 
-              {/* Navigation Buttons */}
               <div className="space-y-4">
                 <button
-                  onClick={() => handleNavigation("/matching")}
-                  className={cn(
-                    "w-full py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3",
-                    "bg-white text-black hover:bg-zinc-200 active:scale-95 transition-all"
-                  )}
+                  onClick={() => router.push("/matching")}
+                  className="w-full py-5 rounded-2xl bg-white text-black font-black flex items-center justify-center gap-3 text-xs uppercase tracking-widest hover:bg-zinc-200 active:scale-95 transition-all"
                 >
                   <Hash className="w-4 h-4" /> Random Match
                 </button>
 
                 <button
-                  onClick={() => handleNavigation("/lobby")}
-                  className={cn(
-                    "w-full py-5 rounded-2xl font-black text-xs uppercase tracking-widest border flex items-center justify-center gap-3",
-                    "bg-zinc-900 border-zinc-800 text-white hover:bg-zinc-800 active:scale-95 transition-all"
-                  )}
+                  onClick={() => router.push("/lobby")}
+                  className="w-full py-5 rounded-2xl bg-zinc-900 border border-zinc-800 text-white font-black flex items-center justify-center gap-3 text-xs uppercase tracking-widest hover:bg-zinc-800 active:scale-95 transition-all"
                 >
                   <Users className="w-4 h-4" /> Lobby / Private Room
                 </button>
