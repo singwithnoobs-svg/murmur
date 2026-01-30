@@ -4,12 +4,10 @@ import { useEffect, useState, useRef, Suspense, memo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, LogOut, RefreshCw, Zap, Loader2, Flag, X } from "lucide-react";
+import { Send, LogOut, RefreshCw, Zap, Loader2, Flag, X, Youtube } from "lucide-react";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
-/* AD COMPONENT: Wrapped in memo to prevent it from re-loading 
-  every time a new message arrives.
-*/
+/* AD COMPONENT: Wrapped in memo with Diagnostic Logs and Channel Fallback */
 const AdsterraBanner = memo(() => {
   const adRef = useRef<HTMLDivElement>(null);
 
@@ -32,19 +30,13 @@ const AdsterraBanner = memo(() => {
       adScript.type = "text/javascript";
       adScript.src = "https://www.highperformanceformat.com/fa3453ae0f13be3b5ba238031d224e99/invoke.js";
 
-      // Error Handling Log
-      adScript.onerror = () => console.error("[ADSTERRA] Script failed to load. Possible AdBlocker or Network issue.");
+      adScript.onerror = () => console.error("[ADSTERRA] Script failed to load.");
       adScript.onload = () => {
-        console.log("[ADSTERRA] Script injected successfully. Waiting for ad delivery...");
-        
-        // Check if the ad actually rendered an iframe after 3 seconds
+        console.log("[ADSTERRA] Script injected. Checking delivery...");
         setTimeout(() => {
           const hasIframe = adRef.current?.querySelector('iframe');
-          if (hasIframe) {
-            console.log("[ADSTERRA] SUCCESS: Ad iframe is visible and active.");
-          } else {
-            console.warn("[ADSTERRA] WARNING: Script loaded but no ad was filled. This is common for low-traffic or new sites.");
-          }
+          if (hasIframe) console.log("[ADSTERRA] SUCCESS: Ad active.");
+          else console.warn("[ADSTERRA] WARNING: No ad fill. Showing fallback.");
         }, 3000);
       };
 
@@ -53,25 +45,42 @@ const AdsterraBanner = memo(() => {
     }
   }, []);
 
- return (
-  <div className="flex flex-col items-center my-8 py-4 border-y border-zinc-900/50 bg-zinc-950/30">
-    <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.4em] mb-4">
-      — Transmission —
-    </span>
-    {/* Diagnostic Wrapper: If you see this purple border, the container is ready */}
-    <div 
-      ref={adRef} 
-      className="rounded-xl overflow-hidden border border-purple-500/20 shadow-[0_0_20px_rgba(168,85,247,0.1)] min-h-[250px] min-w-[300px] flex items-center justify-center bg-zinc-900/50 relative"
-    >
-      {/* This text will be hidden IF an ad actually covers it */}
-      <div className="absolute inset-0 flex items-center justify-center -z-10">
-        <span className="text-[10px] text-zinc-800 font-mono animate-pulse">
-          FETCHING_AD_STREAM...
-        </span>
+  return (
+    <div className="flex flex-col items-center my-8 py-4 border-y border-zinc-900/50 bg-zinc-950/30">
+      <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.4em] mb-4">
+        — Sponsored Transmission —
+      </span>
+      
+      <div className="relative rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900 shadow-2xl min-h-[250px] min-w-[300px] flex items-center justify-center group">
+        {/* 1. THE ACTUAL AD (Top Layer) */}
+        <div ref={adRef} className="z-20 relative" />
+
+        {/* 2. THE CHANNEL FALLBACK (Visible if ad is blank) */}
+        <a 
+          href="https://youtube.com/@yourchannel" // REPLACE WITH YOUR LINK
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 text-center space-y-4 bg-zinc-900 hover:bg-zinc-800 transition-colors cursor-pointer"
+        >
+          <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20 group-hover:scale-110 transition-transform duration-500">
+            <Youtube className="w-7 h-7 text-red-500" />
+          </div>
+          
+          <div className="space-y-2">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">
+              Signal Interrupted
+            </p>
+            <p className="text-xs text-white font-black uppercase tracking-widest bg-red-600 px-4 py-2 rounded-lg shadow-lg">
+              SUBSCRIBE TO CHANNEL
+            </p>
+            <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-tighter">
+              Bypass encryption to join the source
+            </p>
+          </div>
+        </a>
       </div>
     </div>
-  </div>
-);
+  );
 });
 AdsterraBanner.displayName = "AdsterraBanner";
 
@@ -95,7 +104,6 @@ function ChatContent() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isPartnerTyping]);
@@ -220,13 +228,13 @@ function ChatContent() {
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-zinc-950 text-zinc-100 overflow-hidden">
+    <div className="flex flex-col h-[100dvh] bg-zinc-950 text-zinc-100 overflow-hidden selection:bg-blue-500/30">
       
-      {/* REPORT MODAL REMAINED SAME */}
+      {/* REPORT MODAL */}
       <AnimatePresence>
         {showReportModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl w-full max-w-sm">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl w-full max-w-sm shadow-2xl">
               <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-red-500"><Flag className="w-5 h-5"/> Report User</h3>
               <div className="space-y-3 mb-6">
                 {["Inappropriate Behavior", "Spamming", "Harassment", "Other"].map((r) => (
@@ -246,11 +254,11 @@ function ChatContent() {
 
       <header className="h-20 shrink-0 border-b border-zinc-800/50 bg-zinc-900/40 backdrop-blur-xl flex items-center justify-between px-4 md:px-8">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-600/20 rounded-xl flex items-center justify-center border border-blue-500/30">
+          <div className="w-10 h-10 bg-blue-600/20 rounded-xl flex items-center justify-center border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
             <Zap className="w-5 h-5 text-blue-400" />
           </div>
           <div className="min-w-0">
-            <h2 className="font-bold text-sm md:text-lg truncate">
+            <h2 className="font-bold text-sm md:text-lg truncate max-w-[150px] md:max-w-none">
                 {partnerNickname || "Connecting..."}
             </h2>
             <div className="flex items-center gap-2">
@@ -268,12 +276,11 @@ function ChatContent() {
         </div>
       </header>
 
-      {/* MESSAGES WITH AD INJECTION */}
       <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 no-scrollbar overscroll-none">
         <AnimatePresence>
           {!partnerNickname && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center h-full text-zinc-600 space-y-4">
-              <Loader2 className="w-8 h-8 animate-spin" />
+              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
               <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Establishing link...</p>
             </motion.div>
           )}
@@ -284,21 +291,20 @@ function ChatContent() {
             <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
               className={`max-w-[85%] md:max-w-[75%] flex flex-col ${msg.nickname === nickname ? "ml-auto items-end" : "items-start"}`}>
               <span className="text-[10px] font-bold text-zinc-500 mb-1 uppercase tracking-tighter">{msg.nickname}</span>
-              <div className={`px-4 py-3 rounded-2xl text-[15px] md:text-[16px] leading-relaxed shadow-lg ${
+              <div className={`px-4 py-3 rounded-2xl text-[15px] md:text-[16px] shadow-lg leading-relaxed ${
                 msg.nickname === nickname ? "bg-blue-600 text-white rounded-tr-none" : "bg-zinc-900 border border-zinc-800 rounded-tl-none"
               }`}>
                 {msg.content}
               </div>
             </motion.div>
 
-            {/* SHOW AD EVERY 10 MESSAGES */}
             {(i + 1) % 10 === 0 && <AdsterraBanner />}
           </div>
         ))}
-        <div ref={scrollRef} className="h-2" />
+        <div ref={scrollRef} className="h-4" />
       </div>
 
-      <div className="shrink-0 p-4 md:p-8 bg-zinc-950/50 backdrop-blur-md border-t border-zinc-900/80">
+      <div className="shrink-0 p-4 md:p-8 bg-zinc-950/50 backdrop-blur-md border-t border-zinc-900/80 safe-bottom">
         <div className="max-w-5xl mx-auto">
           <AnimatePresence>
             {isPartnerTyping && (
@@ -317,7 +323,7 @@ function ChatContent() {
               placeholder={partnerNickname ? "Type a message..." : "Waiting for connection..."} 
               className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl pl-4 pr-14 py-4 outline-none text-[16px] text-white focus:border-blue-500/50 transition-all disabled:opacity-30" 
             />
-            <button type="submit" disabled={!partnerNickname || !newMessage.trim()} className="absolute right-2 p-3 bg-blue-600 text-white rounded-xl active:scale-90 disabled:opacity-0 transition-all">
+            <button type="submit" disabled={!partnerNickname || !newMessage.trim()} className="absolute right-2 p-3 bg-blue-600 text-white rounded-xl active:scale-90 disabled:opacity-0 transition-all shadow-lg">
               <Send className="w-5 h-5" />
             </button>
           </form>
