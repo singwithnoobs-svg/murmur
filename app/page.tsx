@@ -34,13 +34,20 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-[100dvh] bg-zinc-950 text-zinc-100 flex flex-col">
+
+      {/* Navbar */}
       <Navbar />
 
-      <main className="flex-1 overflow-y-auto pt-32 pb-20 px-6 no-scrollbar">
+      {/* Main content */}
+      <main className="flex-1 overflow-y-auto pt-32 pb-32 px-6 no-scrollbar">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
 
           {/* LEFT SIDE */}
-          <motion.div initial={{opacity:0,x:-20}} animate={{opacity:1,x:0}} className="space-y-8">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="space-y-8"
+          >
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold tracking-widest uppercase">
               <Zap className="w-3 h-3" /> System Live
             </div>
@@ -65,31 +72,54 @@ export default function LandingPage() {
             </div>
           </motion.div>
 
-          {/* RIGHT CARD */}
-          <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} className="relative">
-            {/* Gradient background (clicks pass through) */}
+          {/* RIGHT SIDE CARD */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative"
+          >
+            {/* Decorative gradient (clicks pass through) */}
             <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl blur opacity-20 pointer-events-none" />
 
             <div className="relative bg-zinc-900 border border-zinc-800 p-8 md:p-12 rounded-3xl shadow-2xl">
 
-              {/* IDENTITY */}
+              {/* Assigned Identity */}
               <div className="mb-10">
-                <label className="text-[10px] uppercase tracking-[0.2em] font-black text-zinc-600 ml-1">Assigned Identity</label>
+                <label className="text-[10px] uppercase tracking-[0.2em] font-black text-zinc-600 ml-1">
+                  Assigned Identity
+                </label>
                 <div className="flex items-center gap-3 mt-2 bg-zinc-950 border border-zinc-800 p-5 rounded-2xl">
-                  <span className="text-xl md:text-2xl font-mono text-purple-400 font-bold flex-1 tracking-tight">{name}</span>
-                  <button onClick={generateIdentity} className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors">
+                  <span className="text-xl md:text-2xl font-mono text-purple-400 font-bold flex-1 tracking-tight">
+                    {name}
+                  </span>
+                  <button
+                    onClick={generateIdentity}
+                    className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors"
+                  >
                     <RefreshCw className="w-5 h-5" />
                   </button>
                 </div>
               </div>
 
-              {/* ACTION BUTTONS */}
+              {/* Action Buttons */}
               <div className="space-y-4">
-                <button onClick={() => router.push("/matching")} className={cn("w-full py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3","bg-white text-black hover:bg-zinc-200 active:scale-95")}>
+                <button
+                  onClick={() => router.push("/matching")}
+                  className={cn(
+                    "w-full py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3",
+                    "bg-white text-black hover:bg-zinc-200 active:scale-95"
+                  )}
+                >
                   <Hash className="w-4 h-4" /> Random Match
                 </button>
 
-                <button onClick={() => router.push("/lobby")} className={cn("w-full py-5 rounded-2xl font-black text-xs uppercase tracking-widest border flex items-center justify-center gap-3","bg-zinc-900 border-zinc-800 text-white hover:bg-zinc-800 active:scale-95")}>
+                <button
+                  onClick={() => router.push("/lobby")}
+                  className={cn(
+                    "w-full py-5 rounded-2xl font-black text-xs uppercase tracking-widest border flex items-center justify-center gap-3",
+                    "bg-zinc-900 border-zinc-800 text-white hover:bg-zinc-800 active:scale-95"
+                  )}
+                >
                   <Users className="w-4 h-4" /> Lobby / Private Room
                 </button>
               </div>
@@ -103,8 +133,8 @@ export default function LandingPage() {
         </div>
       </main>
 
-      {/* BANNER AD (outside main, visible, clickable) */}
-      <div className="flex justify-center pb-6 z-10 relative">
+      {/* Sticky Banner */}
+      <div className="sticky bottom-0 flex justify-center pb-6 z-10 bg-zinc-950">
         <AdsterraBanner adKey="fa3453ae0f13be3b5ba238031d224e99" width={300} height={250} />
       </div>
     </div>
