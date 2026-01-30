@@ -4,21 +4,13 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import AdsterraBanner from "@/components/AdsterraBanner";
-import {
-  Shield,
-  Zap,
-  Lock,
-  RefreshCw,
-  Hash,
-  Users,
-} from "lucide-react";
+import { Shield, Zap, Lock, RefreshCw, Hash, Users } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { cn } from "@/lib/utils";
 
 /* =========================
    ADVANCED IDENTITY WORD BANK
    ========================= */
-
 const prefixes = [
   "Neon", "Void", "Silent", "Dark", "Solar", "Lunar", "Ghost",
   "Cyber", "Static", "Crimson", "Quantum", "Hidden", "Obsidian",
@@ -35,7 +27,6 @@ const suffixes = [
   "Prime", "Alpha", "Omega", "X", "Z", "Mk", "EX", "ULTRA",
   "Void", "One", "Null", "Origin", "Edge"
 ];
-
 /* ========================= */
 
 export default function LandingPage() {
@@ -47,11 +38,7 @@ export default function LandingPage() {
     const c = cores[Math.floor(Math.random() * cores.length)];
     const s = suffixes[Math.floor(Math.random() * suffixes.length)];
 
-    // Always two digits (00–99)
-    const number = Math.floor(Math.random() * 100)
-      .toString()
-      .padStart(2, "0");
-
+    const number = Math.floor(Math.random() * 100).toString().padStart(2, "0");
     const identity = `${p}${c}${s}${number}`;
     setName(identity);
 
@@ -133,7 +120,7 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              {/* ACTION BUTTONS (CLEAN) */}
+              {/* ACTION BUTTONS */}
               <div className="space-y-4">
                 <button
                   onClick={() => router.push("/matching")}
@@ -164,13 +151,17 @@ export default function LandingPage() {
           </motion.div>
         </div>
       </main>
-     <div className="pb-6 flex justify-center">
-  <AdsterraBanner
-    adKey="fa3453ae0f13be3b5ba238031d224e99"
-    width={300}
-    height={250}
-  />
-</div>
- </div>
+
+      {/* =====================
+          CENTERED ADSTERAA BANNER
+          ===================== */}
+      <div className="flex justify-center py-4">
+        <AdsterraBanner
+          adKey="fa3453ae0f13be3b5ba238031d224e99"
+          width={300}
+          height={250}
+        />
+      </div>
+    </div>
   );
 }
