@@ -53,14 +53,25 @@ const AdsterraBanner = memo(() => {
     }
   }, []);
 
-  return (
-    <div className="flex flex-col items-center my-8 py-4 border-y border-zinc-900/50 bg-zinc-950/30">
-      <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.4em] mb-4">
-        — Sponsored Signal —
-      </span>
-      <div ref={adRef} className="rounded-xl overflow-hidden border border-zinc-800 shadow-2xl min-h-[250px] min-w-[300px] flex items-center justify-center bg-zinc-900" />
+ return (
+  <div className="flex flex-col items-center my-8 py-4 border-y border-zinc-900/50 bg-zinc-950/30">
+    <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.4em] mb-4">
+      — Transmission —
+    </span>
+    {/* Diagnostic Wrapper: If you see this purple border, the container is ready */}
+    <div 
+      ref={adRef} 
+      className="rounded-xl overflow-hidden border border-purple-500/20 shadow-[0_0_20px_rgba(168,85,247,0.1)] min-h-[250px] min-w-[300px] flex items-center justify-center bg-zinc-900/50 relative"
+    >
+      {/* This text will be hidden IF an ad actually covers it */}
+      <div className="absolute inset-0 flex items-center justify-center -z-10">
+        <span className="text-[10px] text-zinc-800 font-mono animate-pulse">
+          FETCHING_AD_STREAM...
+        </span>
+      </div>
     </div>
-  );
+  </div>
+);
 });
 AdsterraBanner.displayName = "AdsterraBanner";
 
