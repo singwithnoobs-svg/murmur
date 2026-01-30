@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Script from "next/script"; // IMPORT NEXT SCRIPT
 import { motion } from "framer-motion";
 import { Shield, Zap, Lock, RefreshCw, Hash, Users } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -28,12 +29,17 @@ export default function LandingPage() {
   useEffect(() => { generateIdentity(); }, []);
 
   return (
-    // FIX: Using h-screen and overflow-y-auto ensures the background color 
-    // covers the entire viewport regardless of content height.
     <div className="h-screen w-full bg-zinc-950 text-zinc-100 selection:bg-purple-500/30 overflow-y-auto flex flex-col">
+      
+      {/* 1. POPUNDER INTEGRATION */}
+      {/* Strategy "afterInteractive" ensures the ad loads after your page is visible */}
+      <Script 
+        src="https://pl28607177.effectivegatecpm.com/11/51/ff/1151ff7b18afeec16c85f888914eae00.js" 
+        strategy="afterInteractive" 
+      />
+
       <Navbar />
 
-      {/* FIX: Using items-center and justify-center to prevent the 'floating' effect at the top */}
       <main className="flex-1 flex items-center justify-center py-20 px-6">
         <div className="max-w-7xl w-full mx-auto grid lg:grid-cols-2 gap-16 items-center">
 
