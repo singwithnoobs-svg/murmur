@@ -57,7 +57,7 @@ const AdsterraBanner = memo(() => {
 
         {/* 2. THE CHANNEL FALLBACK (Visible if ad is blank) */}
         <a 
-          href="https://youtube.com/@yourchannel" // REPLACE WITH YOUR LINK
+          href="https://youtube.com/@cgvanish" // REPLACE WITH YOUR LINK
           target="_blank" 
           rel="noopener noreferrer"
           className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 text-center space-y-4 bg-zinc-900 hover:bg-zinc-800 transition-colors cursor-pointer"
