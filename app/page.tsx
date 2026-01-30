@@ -2,11 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Script from "next/script"; // IMPORT NEXT SCRIPT
 import { motion } from "framer-motion";
 import { Shield, Zap, Lock, RefreshCw, Hash, Users } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import { cn } from "@/lib/utils";
 
 const prefixes = ["Neon","Void","Silent","Dark","Solar","Lunar","Ghost","Cyber","Static","Crimson","Quantum","Hidden","Obsidian","Frozen","Infinite","Echo","Nova","Shadow","Digital","Zero"];
 const cores = ["Phantom","Cipher","Oracle","Specter","Runner","Signal","Apex","Pulse","Drift","Vector","Nexus","Warp","Flux","Vortex","Kernel","Node","Logic","Protocol","Entity","Core"];
@@ -30,14 +28,6 @@ export default function LandingPage() {
 
   return (
     <div className="h-screen w-full bg-zinc-950 text-zinc-100 selection:bg-purple-500/30 overflow-y-auto flex flex-col">
-      
-      {/* 1. POPUNDER INTEGRATION */}
-      {/* Strategy "afterInteractive" ensures the ad loads after your page is visible */}
-      <Script 
-        src="https://pl28607177.effectivegatecpm.com/11/51/ff/1151ff7b18afeec16c85f888914eae00.js" 
-        strategy="afterInteractive" 
-      />
-
       <Navbar />
 
       <main className="flex-1 flex items-center justify-center py-20 px-6">
