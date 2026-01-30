@@ -4,18 +4,22 @@ import { useEffect, useState, useRef, memo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
-import { Hash, Send, Trash2, AlertTriangle, LogOut, Copy, Check, Flag, X, Zap, Youtube } from "lucide-react";
+import { Hash, Send, Trash2, AlertTriangle, LogOut, Copy, Check, Flag, X } from "lucide-react";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
-/* AD COMPONENT: memoized for Lobby/Private Rooms */
+/* AD COMPONENT: Optimized for Banner Display only */
 const AdsterraBanner = memo(() => {
   const adRef = useRef<HTMLDivElement>(null);
+  const initialized = useRef(false);
 
   useEffect(() => {
-    if (adRef.current && !adRef.current.firstChild) {
-      console.log("[ADSTERRA] Initializing ad container (Room)...");
+    // Only initialize if the ref exists and hasn't been run for this instance
+    if (adRef.current && !initialized.current) {
+      initialized.current = true;
+      const container = adRef.current;
 
       const configScript = document.createElement("script");
+      configScript.type = "text/javascript";
       configScript.innerHTML = `
         atOptions = {
           'key' : 'fa3453ae0f13be3b5ba238031d224e99',
@@ -28,44 +32,28 @@ const AdsterraBanner = memo(() => {
       
       const adScript = document.createElement("script");
       adScript.type = "text/javascript";
-      adScript.src = "https://www.highperformanceformat.com/fa3453ae0f13be3b5ba238031d224e99/invoke.js";
+      adScript.src = "//www.highperformanceformat.com/fa3453ae0f13be3b5ba238031d224e99/invoke.js";
 
-      adScript.onload = () => {
-        setTimeout(() => {
-          const hasIframe = adRef.current?.querySelector('iframe');
-          if (hasIframe) console.log("[ADSTERRA] SUCCESS: Room Ad active.");
-          else console.warn("[ADSTERRA] WARNING: Showing Fallback.");
-        }, 3000);
-      };
-
-      adRef.current.appendChild(configScript);
-      adRef.current.appendChild(adScript);
+      container.appendChild(configScript);
+      container.appendChild(adScript);
     }
   }, []);
 
   return (
-    <div className="flex flex-col items-center my-8 py-4 border-y border-zinc-900/50 bg-zinc-950/30">
-      <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.4em] mb-4">
-        — Sponsored Transmission —
+    <div className="flex flex-col items-center my-8 py-6 border-y border-zinc-900/50 bg-zinc-950/40 shadow-inner">
+      <span className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.4em] mb-4">
+        Sponsored Message
       </span>
-      <div className="relative rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900 shadow-2xl min-h-[250px] min-w-[300px] flex items-center justify-center group">
-        <div ref={adRef} className="z-20 relative" />
-        <a 
-          href="https://youtube.com/@cgvanish" // REPLACE WITH YOUR LINK
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 text-center space-y-4 bg-zinc-900 hover:bg-zinc-800 transition-colors cursor-pointer"
-        >
-          <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20 group-hover:scale-110 transition-transform duration-500">
-            <Youtube className="w-7 h-7 text-red-500" />
-          </div>
-          <div className="space-y-2">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Signal Interrupted</p>
-            <p className="text-xs text-white font-black uppercase tracking-widest bg-red-600 px-4 py-2 rounded-lg shadow-lg">SUBSCRIBE TO CHANNEL</p>
-            <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-tighter">Bypass encryption to join the source</p>
-          </div>
-        </a>
-      </div>
+      
+      {/* Strict 300x250 container */}
+      <div 
+        ref={adRef} 
+        className="rounded-xl overflow-hidden border border-zinc-800 bg-black min-h-[250px] min-w-[300px] flex items-center justify-center shadow-2xl"
+      />
+      
+      <p className="text-[8px] text-zinc-800 mt-3 font-bold uppercase tracking-tighter">
+        Secure Ad Link • Encrypted Connection
+      </p>
     </div>
   );
 });
@@ -281,7 +269,7 @@ export default function ChatRoom() {
               </motion.div>
             )}
 
-            {/* ADSTERRA INJECTION EVERY 10 MESSAGES */}
+            {/* AD INJECTION EVERY 10 MESSAGES */}
             {(i + 1) % 10 === 0 && <AdsterraBanner />}
           </div>
         ))}
