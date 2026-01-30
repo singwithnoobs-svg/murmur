@@ -3,8 +3,9 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { motion } from "framer-motion";
-import { Loader2, X, Timer } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Loader2, X, Timer, ShieldX, Clock, Calendar } from "lucide-react";
+import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 export default function MatchingPage() {
   const router = useRouter();
@@ -14,7 +15,12 @@ export default function MatchingPage() {
   const [onlineCount, setOnlineCount] = useState(1);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 1. Initial Auth Check
+  // Ban States
+  const [isBanned, setIsBanned] = useState(false);
+  const [banDetails, setBanDetails] = useState<{ reason: string; expires_at: string | null } | null>(null);
+  const [timeLeft, setTimeLeft] = useState<string>("");
+
+  // 1. Initial Auth & Ban Check
   useEffect(() => {
     const savedName = sessionStorage.getItem("murmur_nickname");
     if (!savedName) {
@@ -22,11 +28,63 @@ export default function MatchingPage() {
       return;
     }
     setNickname(savedName);
+
+    const checkBanStatus = async () => {
+      const fp = await (await FingerprintJS.load()).get();
+      const visitorId = fp.visitorId;
+      
+      const { data, error } = await supabase
+        .from("banned_fingerprints")
+        .select("reason, expires_at")
+        .eq("fingerprint", visitorId)
+        .maybeSingle();
+
+      if (data) {
+        // Check if temporary ban has already expired
+        if (data.expires_at && new Date(data.expires_at) < new Date()) {
+          await supabase.from("banned_fingerprints").delete().eq("fingerprint", visitorId);
+          setIsBanned(false);
+        } else {
+          setBanDetails(data);
+          setIsBanned(true);
+          setStatus("Access Denied.");
+        }
+      }
+    };
+
+    checkBanStatus();
   }, [router]);
 
-  // 2. Global Presence (Online Count)
+  // 2. Countdown Timer for Ban
   useEffect(() => {
-    if (!nickname) return;
+    if (!isBanned || !banDetails?.expires_at) return;
+
+    const calculateTime = () => {
+      const now = new Date().getTime();
+      const end = new Date(banDetails.expires_at!).getTime();
+      const diff = end - now;
+
+      if (diff <= 0) {
+        setTimeLeft("EXPIRED");
+        window.location.reload(); // Refresh to lift ban
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      
+      setTimeLeft(`${days}d ${hours}h ${minutes}m`);
+    };
+
+    calculateTime();
+    const timer = setInterval(calculateTime, 60000); // Update every minute
+    return () => clearInterval(timer);
+  }, [isBanned, banDetails]);
+
+  // 3. Global Presence (Online Count)
+  useEffect(() => {
+    if (!nickname || isBanned) return;
     const channel = supabase.channel("global_presence", {
       config: { presence: { key: nickname } },
     });
@@ -43,11 +101,11 @@ export default function MatchingPage() {
       });
 
     return () => { supabase.removeChannel(channel); };
-  }, [nickname]);
+  }, [nickname, isBanned]);
 
-  // 3. Cooldown Logic
+  // 4. Cooldown Logic
   useEffect(() => {
-    if (!nickname) return;
+    if (!nickname || isBanned) return; 
     if (cooldown > 0) {
       const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
       setStatus(`De-syncing frequencies... ${cooldown}s`);
@@ -55,16 +113,14 @@ export default function MatchingPage() {
     } else {
       startProtocol(nickname);
     }
-  }, [cooldown, nickname]);
+  }, [cooldown, nickname, isBanned]);
 
-  const startProtocol = async (name: string) => {
+const startProtocol = async (name: string) => {
     try {
-      // CLEANUP
       setStatus("Purging ghost data...");
       await supabase.from("matchmaking").delete().eq("nickname", name);
-      await new Promise(res => setTimeout(res, 1000)); 
+      await new Promise(res => setTimeout(res, 800)); 
 
-      // SEARCH PHASE
       setStatus("Scanning for signals...");
       const { data: queue } = await supabase
         .from("matchmaking")
@@ -75,33 +131,51 @@ export default function MatchingPage() {
 
       if (queue && queue.length > 0) {
         const partner = queue[0];
-        const roomId = `match_${name.replace(/\s+/g, '')}_${partner.nickname.replace(/\s+/g, '')}_${Date.now()}`;
+        // FIX 1: Simplified Room ID for more reliable matching
+        const roomId = `room_${Math.random().toString(36).substring(2, 15)}`;
         
         await supabase.from("matchmaking").delete().eq("id", partner.id);
-        await supabase.from("rooms").insert([{ id: roomId }]);
         
+        // FIX 2: Ensure room insertion is AWAITED before redirect
+        const { error: roomErr } = await supabase.from("rooms").insert([{ id: roomId }]);
+        
+        if (roomErr) throw roomErr;
+
         setStatus("Link established!");
         router.push(`/random-chat?id=${roomId}`);
 
       } else {
         setStatus("Broadcasting signal...");
+        // Enter the queue
         await supabase.from("matchmaking").insert([{ nickname: name }]);
 
         intervalRef.current = setInterval(async () => {
-          const cleanMe = name.replace(/\s+/g, '');
-          const { data: matchedRooms } = await supabase
-            .from("rooms")
+          // FIX 3: Check if a partner has deleted our matchmaking entry 
+          // (Signifying they created a room for us)
+          const { data: amIStillInQueue } = await supabase
+            .from("matchmaking")
             .select("id")
-            .ilike("id", `%${cleanMe}%`)
-            .order('created_at', { ascending: false });
+            .eq("nickname", name)
+            .maybeSingle();
 
-          if (matchedRooms && matchedRooms.length > 0) {
-            clearInterval(intervalRef.current!);
-            router.push(`/random-chat?id=${matchedRooms[0].id}`);
+          if (!amIStillInQueue) {
+             // If we aren't in queue, it means someone matched us.
+             // Look for the room created in the last 10 seconds that we are part of
+             const { data: matchedRooms } = await supabase
+                .from("rooms")
+                .select("id")
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+             if (matchedRooms && matchedRooms.length > 0) {
+               clearInterval(intervalRef.current!);
+               router.push(`/random-chat?id=${matchedRooms[0].id}`);
+             }
           }
         }, 2000);
       }
     } catch (e: any) {
+      console.error(e);
       setStatus("Signal lost. Retrying...");
       setTimeout(() => startProtocol(name), 3000);
     }
@@ -110,8 +184,50 @@ export default function MatchingPage() {
   const cancelMatch = async () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     await supabase.from("matchmaking").delete().eq("nickname", nickname);
-    router.push("/mode");
+    router.push("/");
   };
+
+  // Render Banned Screen
+  if (isBanned) {
+    return (
+      <div className="h-[100dvh] bg-zinc-950 flex flex-col items-center justify-center p-6 text-center">
+        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-w-sm w-full">
+          <div className="w-20 h-20 bg-red-600/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-red-500/20 shadow-[0_0_30px_rgba(220,38,38,0.1)]">
+            <ShieldX className="w-10 h-10 text-red-500" />
+          </div>
+          
+          <h2 className="text-3xl font-black uppercase italic tracking-tighter text-white mb-6">Access Revoked</h2>
+          
+          <div className="space-y-4 bg-zinc-900/50 border border-zinc-800 p-6 rounded-2xl mb-8">
+            <div className="text-left">
+              <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1 flex items-center gap-2">
+                <X className="w-3 h-3"/> Violation Reason
+              </p>
+              <p className="text-sm font-bold text-zinc-200 uppercase">{banDetails?.reason || "Restricted Behavior"}</p>
+            </div>
+
+            <div className="h-px bg-zinc-800 w-full" />
+
+            <div className="text-left">
+              <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1 flex items-center gap-2">
+                <Clock className="w-3 h-3"/> Remaining Time
+              </p>
+              <p className="text-xl font-black text-red-500 font-mono">
+                {banDetails?.expires_at ? timeLeft : "PERMANENT"}
+              </p>
+            </div>
+          </div>
+
+          <button 
+            onClick={() => router.push("/")} 
+            className="text-zinc-500 hover:text-white transition-colors text-[10px] font-black uppercase tracking-widest underline underline-offset-4"
+          >
+            Return to Surface
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-[100dvh] bg-zinc-950 flex flex-col items-center justify-center p-6 text-zinc-100 font-sans overflow-hidden">
@@ -142,7 +258,6 @@ export default function MatchingPage() {
             <p className="text-zinc-500 font-bold text-[10px] tracking-widest uppercase">
               {status}
             </p>
-            {/* Online Count Display */}
             <div className="flex items-center justify-center gap-2 mt-2">
               <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
               <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
