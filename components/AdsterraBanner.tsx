@@ -1,43 +1,40 @@
 "use client";
+import { useEffect, useRef } from "react";
 
-import { useEffect } from "react";
-
-type Props = {
+interface AdsterraBannerProps {
   adKey: string;
   width: number;
   height: number;
-};
+}
 
-export default function AdsterraBanner({ adKey, width, height }: Props) {
+export default function AdsterraBanner({ adKey, width, height }: AdsterraBannerProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    const script1 = document.createElement("script");
-    script1.type = "text/javascript";
-    script1.innerHTML = `
-      atOptions = {
-        'key': '${adKey}',
-        'format': 'iframe',
-        'height': ${height},
-        'width': ${width},
-        'params': {}
-      };
-    `;
+    if (!containerRef.current) return;
 
-    const script2 = document.createElement("script");
-    script2.type = "text/javascript";
-    script2.src = `//www.highperformanceformat.com/${adKey}/invoke.js`;
+    // Remove old ad if exists
+    containerRef.current.innerHTML = "";
 
-    const container = document.getElementById(`ad-${adKey}`);
-    if (container && container.childNodes.length === 0) {
-      container.appendChild(script1);
-      container.appendChild(script2);
-    }
+    // Create script element
+    const script = document.createElement("script");
+    script.src = `https://www.highperformanceformat.com/${adKey}/invoke.js`;
+    script.async = true;
+
+    // Create container div for Adsterra iframe
+    const adDiv = document.createElement("div");
+    adDiv.style.width = `${width}px`;
+    adDiv.style.height = `${height}px`;
+
+    containerRef.current.appendChild(adDiv);
+    containerRef.current.appendChild(script);
+
+    return () => {
+      // Cleanup
+      containerRef.current?.removeChild(script);
+      containerRef.current?.removeChild(adDiv);
+    };
   }, [adKey, width, height]);
 
-  return (
-    <div
-      id={`ad-${adKey}`}
-      className="flex justify-center items-center my-6"
-      style={{ minWidth: width, minHeight: height }}
-    />
-  );
+  return <div ref={containerRef} className="flex justify-center" />;
 }
