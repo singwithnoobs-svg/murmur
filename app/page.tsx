@@ -33,7 +33,7 @@ export default function LandingPage() {
   useEffect(() => { generateIdentity(); }, []);
 
   return (
-    <div className="h-[100dvh] bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden">
+    <div className="min-h-[100dvh] bg-zinc-950 text-zinc-100 flex flex-col">
       <Navbar />
 
       <main className="flex-1 overflow-y-auto pt-32 pb-20 px-6 no-scrollbar">
@@ -67,7 +67,9 @@ export default function LandingPage() {
 
           {/* RIGHT CARD */}
           <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} className="relative">
-            <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl blur opacity-20" />
+            {/* Gradient background (clicks pass through) */}
+            <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl blur opacity-20 pointer-events-none" />
+
             <div className="relative bg-zinc-900 border border-zinc-800 p-8 md:p-12 rounded-3xl shadow-2xl">
 
               {/* IDENTITY */}
@@ -101,8 +103,8 @@ export default function LandingPage() {
         </div>
       </main>
 
-      {/* BANNER AD */}
-      <div className="pb-6 flex justify-center">
+      {/* BANNER AD (outside main, visible, clickable) */}
+      <div className="flex justify-center pb-6 z-10 relative">
         <AdsterraBanner adKey="fa3453ae0f13be3b5ba238031d224e99" width={300} height={250} />
       </div>
     </div>
