@@ -1,36 +1,27 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import "./globals.css"; // Ensure this file exists in your /app folder
-import { cn } from "@/lib/utils";
+import "./globals.css"; // 1. THIS MUST BE IMPORTED FIRST
+import TermsModal from "@/components/TermsModal";
 
 const inter = Inter({ subsets: ["latin"] });
 
-export const metadata = {
-  title: "Murmur",
-  description: "Anonymous Chat",
-  manifest: "/manifest.json",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0",
-  themeColor: "#09090b",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "Murmur",
-  },
+export const metadata: Metadata = {
+  title: "MURMUR",
+  description: "Chat like a ghost",
 };
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body 
-        className={cn(
-          inter.className, 
-          "bg-zinc-950 text-zinc-100 antialiased overflow-hidden h-[100dvh] w-screen"
-        )}
-      >
-        {children}
+    <html lang="en" className="dark"> 
+      <body className={`${inter.className} bg-zinc-950 text-white antialiased`}>
+        {/* 2. Wrap EVERYTHING inside the body */}
+        <TermsModal>
+          {children}
+        </TermsModal>
       </body>
     </html>
   );
