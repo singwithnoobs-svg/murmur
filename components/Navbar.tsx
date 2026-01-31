@@ -25,8 +25,8 @@ export default function Navbar() {
             <MessageSquare className="w-5 h-5 text-purple-500 group-hover:scale-110 transition-transform duration-300" />
           </div>
           <div className="flex flex-col">
-            <span className="font-black text-xl tracking-tighter italic leading-none">MURMUR</span>
-            <span className="text-[8px] text-zinc-600 font-bold tracking-[0.3em] uppercase">Encrypted</span>
+            <span className="font-black text-xl tracking-tighter italic leading-none">Murmurz.Org</span>
+            <span className="text-[8px] text-zinc-600 font-bold tracking-[0.3em] uppercase">Safe</span>
           </div>
         </Link>
 
@@ -61,7 +61,7 @@ export default function Navbar() {
           <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900/50 border border-zinc-800">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">
-              Nodes Secured
+              Secured Connection
             </span>
           </div>
           
