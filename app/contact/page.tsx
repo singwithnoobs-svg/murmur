@@ -57,7 +57,7 @@ export default function ContactPage() {
                 or any other platform-related issues.
               </p>
               <a
-                href="https://discord.gg/your-discord-link"
+                href="https://discord.gg/YKbNfsbc"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block text-sm font-semibold text-white hover:underline"
