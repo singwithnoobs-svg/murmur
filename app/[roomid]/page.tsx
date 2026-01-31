@@ -6,14 +6,12 @@ import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import { Hash, Send, Trash2, AlertTriangle, LogOut, Copy, Check, Flag, X } from "lucide-react";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
-
-/* AD COMPONENT: Optimized for Banner Display only */
+/* AD COMPONENT: Updated with New Key for murmurz.org */
 const AdsterraBanner = memo(() => {
   const adRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
 
   useEffect(() => {
-    // Only initialize if the ref exists and hasn't been run for this instance
     if (adRef.current && !initialized.current) {
       initialized.current = true;
       const container = adRef.current;
@@ -22,7 +20,7 @@ const AdsterraBanner = memo(() => {
       configScript.type = "text/javascript";
       configScript.innerHTML = `
         atOptions = {
-          'key' : 'fa3453ae0f13be3b5ba238031d224e99',
+          'key' : 'd5b7d02c3eed6fede79ae09ea0e30660',
           'format' : 'iframe',
           'height' : 250,
           'width' : 300,
@@ -32,7 +30,7 @@ const AdsterraBanner = memo(() => {
       
       const adScript = document.createElement("script");
       adScript.type = "text/javascript";
-      adScript.src = "//www.highperformanceformat.com/fa3453ae0f13be3b5ba238031d224e99/invoke.js";
+      adScript.src = "//www.highperformanceformat.com/d5b7d02c3eed6fede79ae09ea0e30660/invoke.js";
 
       container.appendChild(configScript);
       container.appendChild(adScript);
@@ -45,7 +43,6 @@ const AdsterraBanner = memo(() => {
         Sponsored Message
       </span>
       
-      {/* Strict 300x250 container */}
       <div 
         ref={adRef} 
         className="rounded-xl overflow-hidden border border-zinc-800 bg-black min-h-[250px] min-w-[300px] flex items-center justify-center shadow-2xl"
