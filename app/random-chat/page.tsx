@@ -10,6 +10,7 @@ import FingerprintJS from '@fingerprintjs/fingerprintjs';
 /* AD COMPONENT: Optimized for Banner Display only.
   Uses a ref-check to ensure scripts only load once per instance.
 */
+/* AD COMPONENT: Updated with New Key for murmurz.org */
 const AdsterraBanner = memo(() => {
   const adRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
@@ -19,12 +20,12 @@ const AdsterraBanner = memo(() => {
       initialized.current = true;
       const container = adRef.current;
 
-      // 1. Create the Config Script
+      // 1. Create the Config Script with NEW KEY: d5b7d02c3eed6fede79ae09ea0e30660
       const config = document.createElement("script");
       config.type = "text/javascript";
       config.innerHTML = `
         atOptions = {
-          'key' : 'fa3453ae0f13be3b5ba238031d224e99',
+          'key' : 'd5b7d02c3eed6fede79ae09ea0e30660',
           'format' : 'iframe',
           'height' : 250,
           'width' : 300,
@@ -32,10 +33,10 @@ const AdsterraBanner = memo(() => {
         };
       `;
 
-      // 2. Create the Invoke Script
+      // 2. Create the Invoke Script with NEW KEY path
       const invoke = document.createElement("script");
       invoke.type = "text/javascript";
-      invoke.src = "//www.highperformanceformat.com/fa3453ae0f13be3b5ba238031d224e99/invoke.js";
+      invoke.src = "//www.highperformanceformat.com/d5b7d02c3eed6fede79ae09ea0e30660/invoke.js";
 
       // 3. Append to container
       container.appendChild(config);
