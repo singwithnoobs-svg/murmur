@@ -32,14 +32,25 @@ export default function LobbyPage() {
   useEffect(() => {
     const runSecurityCheck = async () => {
       setIsVerifying(true);
+      
+      // 1. CAPTURE THE INVITE ID IMMEDIATELY
+      const invitedId = searchParams.get("id");
+
+      // 2. CHECK NICKNAME AUTHENTICATION
       const savedNickname = sessionStorage.getItem("murmur_nickname");
-      if (!savedNickname) { router.push("/"); return; }
+      if (!savedNickname) { 
+        // If no nickname, go to Home but PRESERVE the ID in the query string
+        const redirectPath = invitedId ? `/?id=${invitedId}` : "/";
+        router.push(redirectPath); 
+        return; 
+      }
 
       try {
         const fpLoad = await FingerprintJS.load();
         const fpResult = await fpLoad.get();
         const visitorId = fpResult.visitorId;
 
+        // BAN CHECK
         const { data: banData } = await supabase.from("banned_fingerprints").select("*").eq("fingerprint", visitorId).maybeSingle();
         if (banData) {
           setIsBlocked(true);
@@ -48,6 +59,7 @@ export default function LobbyPage() {
           return;
         }
 
+        // REPORT CHECK
         const { count } = await supabase.from("reports").select("*", { count: 'exact', head: true }).eq("fingerprint", visitorId);
         if (count && count >= 5) {
           setIsBlocked(true);
@@ -56,13 +68,13 @@ export default function LobbyPage() {
           return;
         }
 
-        const invitedId = searchParams.get("id");
+        // 3. AUTO-FILL ROOM ID IF USER CAME FROM AN INVITE LINK
         if (invitedId) {
           setRoomId(invitedId);
           setAction("join");
         }
       } catch (err) {
-        console.error(err);
+        console.error("Security handshake failed:", err);
       } finally {
         setIsVerifying(false);
       }
@@ -79,7 +91,6 @@ export default function LobbyPage() {
     const { data: existingRoom } = await supabase.from("rooms").select("*").eq("id", cleanId).maybeSingle();
 
     if (action === "join") {
-      // JOIN LOGIC: Must exist
       if (!existingRoom) {
         setStatusError("Chat not found. Try creating it instead.");
         setIsProcessing(false);
@@ -87,15 +98,14 @@ export default function LobbyPage() {
       }
       if (existingRoom.is_private) {
         if (!password || existingRoom.password !== password) {
-          setStatusError("Invalid password for this chat .");
+          setStatusError("Invalid password for this chat.");
           setIsProcessing(false);
           return;
         }
       }
     } else {
-      // CREATE LOGIC: Must NOT exist
       if (existingRoom) {
-        setStatusError("Room name already reserved. Try somthing else.");
+        setStatusError("Room name already reserved. Try something else.");
         setIsProcessing(false);
         return;
       }
@@ -107,6 +117,7 @@ export default function LobbyPage() {
       if (createError) { setStatusError("Chat Creation failed."); setIsProcessing(false); return; }
     }
 
+    // Redirect to the actual chat route
     router.push(`/${cleanId}`);
   };
 
@@ -120,11 +131,10 @@ export default function LobbyPage() {
       <main className="flex-1 flex items-center justify-center px-6">
         <div className="w-full max-w-md">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
-            <h1 className="text-5xl font-black tracking-tighter italic uppercase italic"></h1>
-            <p className="text-zinc-500 text-[10px] uppercase tracking-[0.4em] font-bold mt-2">Enjoy Chatting</p>
+            <h1 className="text-5xl font-black tracking-tighter italic uppercase italic">Ghost Lobby</h1>
+            <p className="text-zinc-500 text-[10px] uppercase tracking-[0.4em] font-bold mt-2">Secure P2P Entry</p>
           </motion.div>
 
-          {/* ACTION SELECTOR */}
           <div className="flex bg-zinc-900/50 p-1 rounded-2xl border border-zinc-800/50 mb-4">
             <button 
               onClick={() => { setAction("join"); setStatusError(""); }} 
@@ -147,7 +157,6 @@ export default function LobbyPage() {
           </div>
 
           <motion.div layout className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-[3rem] space-y-6 backdrop-blur-3xl shadow-2xl">
-            {/* ROOM ID INPUT */}
             <div className="space-y-2">
               <div className="flex items-center gap-2 ml-2">
                 <Hash className="w-3 h-3 text-purple-500" />
@@ -164,7 +173,6 @@ export default function LobbyPage() {
               />
             </div>
 
-            {/* PASSWORD INPUT */}
             <div className="space-y-2">
               <div className="flex items-center gap-2 ml-2">
                 <Key className="w-3 h-3 text-zinc-500" />
@@ -174,7 +182,7 @@ export default function LobbyPage() {
               </div>
               <input 
                 type="password" 
-                placeholder={action === "create" ? "Leave empty for public chats" : "Enter password if required"}
+                placeholder={action === "create" ? "Leave empty for public" : "Required for private rooms"}
                 value={password}
                 onChange={(e) => { setPassword(e.target.value); setStatusError(""); }}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-6 py-4 focus:ring-1 focus:ring-purple-500/50 outline-none text-white transition-all placeholder:text-zinc-800"
@@ -197,7 +205,7 @@ export default function LobbyPage() {
             >
               {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : (
                 <>
-                  <span>{action === "create" ? "Create Chat" : "Join Chat"}</span>
+                  <span>{action === "create" ? "Initialize Room" : "Enter Chat"}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -213,9 +221,6 @@ export default function LobbyPage() {
   );
 }
 
-// ... LoadingScreen and BlockedScreen stay the same as your previous script
-
-// Sub-components for cleaner code
 function LoadingScreen() {
   return (
     <div className="h-screen bg-zinc-950 flex flex-col items-center justify-center space-y-4">
