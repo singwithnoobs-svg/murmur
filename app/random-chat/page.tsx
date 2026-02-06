@@ -7,10 +7,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Send, LogOut, RefreshCw, Zap, Loader2, Flag, X } from "lucide-react";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
-/* AD COMPONENT: Optimized for Banner Display only.
-  Uses a ref-check to ensure scripts only load once per instance.
+/* AD COMPONENT: Optimized with Memo and Ref check to prevent 
+  flickering or re-mounting during chat updates.
 */
-/* AD COMPONENT: Updated with New Key for murmurz.org */
 const AdsterraBanner = memo(() => {
   const adRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
@@ -20,7 +19,6 @@ const AdsterraBanner = memo(() => {
       initialized.current = true;
       const container = adRef.current;
 
-      // 1. Create the Config Script with NEW KEY: d5b7d02c3eed6fede79ae09ea0e30660
       const config = document.createElement("script");
       config.type = "text/javascript";
       config.innerHTML = `
@@ -33,12 +31,10 @@ const AdsterraBanner = memo(() => {
         };
       `;
 
-      // 2. Create the Invoke Script with NEW KEY path
       const invoke = document.createElement("script");
       invoke.type = "text/javascript";
       invoke.src = "//www.highperformanceformat.com/d5b7d02c3eed6fede79ae09ea0e30660/invoke.js";
 
-      // 3. Append to container
       container.appendChild(config);
       container.appendChild(invoke);
     }
@@ -49,13 +45,10 @@ const AdsterraBanner = memo(() => {
       <span className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.4em] mb-4">
         Sponsored Message
       </span>
-      
-      {/* Strict 300x250 Box */}
       <div 
         ref={adRef} 
         className="rounded-xl overflow-hidden border border-zinc-800 bg-black min-h-[250px] min-w-[300px] flex items-center justify-center shadow-2xl"
       />
-      
       <p className="text-[8px] text-zinc-800 mt-3 font-bold uppercase tracking-tighter">
         Secure Ad Link • Ghost Protocol Active
       </p>
@@ -74,9 +67,7 @@ function ChatContent() {
   const [nickname, setNickname] = useState("");
   const [myFingerprint, setMyFingerprint] = useState<string | null>(null);
   const [partnerNickname, setPartnerNickname] = useState<string | null>(null);
-  const [partnerFingerprint, setPartnerFingerprint] = useState<string | null>(null);
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
-
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState("");
   
@@ -102,8 +93,7 @@ function ChatContent() {
     const setupChat = async () => {
       const fpLoad = await FingerprintJS.load();
       const result = await fpLoad.get();
-      const visitorId = result.visitorId;
-      setMyFingerprint(visitorId);
+      setMyFingerprint(result.visitorId);
 
       const channel = supabase.channel(`room_${roomid}`, {
         config: { presence: { key: nickname } }
@@ -119,11 +109,9 @@ function ChatContent() {
           if (otherUserKey) {
             const partnerData: any = state[otherUserKey][0];
             setPartnerNickname(otherUserKey);
-            setPartnerFingerprint(partnerData?.fp || null);
             setIsPartnerTyping(partnerData?.isTyping || false);
           } else {
             setPartnerNickname(null);
-            setPartnerFingerprint(null);
             setIsPartnerTyping(false);
           }
         })
@@ -135,13 +123,14 @@ function ChatContent() {
         .on("postgres_changes" as any, { 
           event: "DELETE", schema: "public", table: "rooms", filter: `id=eq.${roomid}` 
         }, () => {
-          router.replace("/matching");
+          // Delayed redirect to prevent UI glitches during signal cleanup
+          setTimeout(() => router.replace("/matching"), 500);
         })
         .subscribe(async (status: string) => {
           if (status === "SUBSCRIBED") {
             await channel.track({ 
               isTyping: false,
-              fp: visitorId,
+              fp: result.visitorId,
               online_at: new Date().toISOString() 
             });
           }
@@ -177,12 +166,8 @@ function ChatContent() {
       channelRef.current.track({ isTyping: false, fp: myFingerprint });
     }
 
-    const { data: roomExists } = await supabase.from("rooms").select("id").eq("id", roomid).single();
-    if (!roomExists) {
-      router.replace("/matching");
-      return;
-    }
-
+    // Removed the manual 'roomExists' check to prevent race-condition kicks.
+    // The message insert will fail gracefully if the room is gone.
     await supabase.from("messages").insert([{ 
       room_id: roomid, 
       nickname: nickname, 
@@ -207,7 +192,7 @@ function ChatContent() {
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-zinc-950 text-zinc-100 overflow-hidden selection:bg-blue-500/30">
+    <div className="flex flex-col h-[100dvh] bg-zinc-950 text-zinc-100 overflow-hidden selection:bg-purple-500/30">
       
       <AnimatePresence>
         {showReportModal && (
@@ -232,11 +217,11 @@ function ChatContent() {
 
       <header className="h-20 shrink-0 border-b border-zinc-800/50 bg-zinc-900/40 backdrop-blur-xl flex items-center justify-between px-4 md:px-8">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-600/20 rounded-xl flex items-center justify-center border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
-            <Zap className="w-5 h-5 text-blue-400" />
+          <div className="w-10 h-10 bg-purple-600/20 rounded-xl flex items-center justify-center border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.2)]">
+            <Zap className="w-5 h-5 text-purple-400" />
           </div>
           <div className="min-w-0">
-            <h2 className="font-bold text-sm md:text-lg truncate max-w-[150px] md:max-w-none">
+            <h2 className="font-bold text-sm md:text-lg truncate max-w-[150px] md:max-w-none uppercase tracking-tighter">
                 {partnerNickname || "Connecting..."}
             </h2>
             <div className="flex items-center gap-2">
@@ -258,7 +243,7 @@ function ChatContent() {
         <AnimatePresence>
           {!partnerNickname && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center h-full text-zinc-600 space-y-4">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
               <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Establishing link...</p>
             </motion.div>
           )}
@@ -270,7 +255,7 @@ function ChatContent() {
               className={`max-w-[85%] md:max-w-[75%] flex flex-col ${msg.nickname === nickname ? "ml-auto items-end" : "items-start"}`}>
               <span className="text-[10px] font-bold text-zinc-500 mb-1 uppercase tracking-tighter">{msg.nickname}</span>
               <div className={`px-4 py-3 rounded-2xl text-[15px] md:text-[16px] shadow-lg leading-relaxed ${
-                msg.nickname === nickname ? "bg-blue-600 text-white rounded-tr-none" : "bg-zinc-900 border border-zinc-800 rounded-tl-none"
+                msg.nickname === nickname ? "bg-purple-600 text-white rounded-tr-none" : "bg-zinc-900 border border-zinc-800 rounded-tl-none"
               }`}>
                 {msg.content}
               </div>
@@ -287,7 +272,7 @@ function ChatContent() {
           <AnimatePresence>
             {isPartnerTyping && (
               <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                className="text-[10px] text-blue-400 font-bold uppercase tracking-widest mb-2 ml-1">
+                className="text-[10px] text-purple-400 font-bold uppercase tracking-widest mb-2 ml-1">
                 Partner is typing...
               </motion.div>
             )}
@@ -299,9 +284,9 @@ function ChatContent() {
               value={newMessage} 
               onChange={(e) => handleInputChange(e.target.value)} 
               placeholder={partnerNickname ? "Type a message..." : "Waiting for connection..."} 
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl pl-4 pr-14 py-4 outline-none text-[16px] text-white focus:border-blue-500/50 transition-all disabled:opacity-30" 
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl pl-4 pr-14 py-4 outline-none text-[16px] text-white focus:border-purple-500/50 transition-all disabled:opacity-30" 
             />
-            <button type="submit" disabled={!partnerNickname || !newMessage.trim()} className="absolute right-2 p-3 bg-blue-600 text-white rounded-xl active:scale-90 disabled:opacity-0 transition-all shadow-lg">
+            <button type="submit" disabled={!partnerNickname || !newMessage.trim()} className="absolute right-2 p-3 bg-purple-600 text-white rounded-xl active:scale-90 disabled:opacity-0 transition-all shadow-lg">
               <Send className="w-5 h-5" />
             </button>
           </form>
