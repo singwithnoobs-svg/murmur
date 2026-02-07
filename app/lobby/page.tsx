@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  ArrowRight, AlertCircle, ShieldCheck, ShieldAlert, 
-  Clock, Zap, Hash, Key, Loader2, Plus, Users 
+  ArrowRight, ShieldAlert, Clock, Zap, Hash, Key, 
+  Loader2, Plus, Users, LayoutGrid
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
@@ -16,7 +16,6 @@ export default function LobbyPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  // Segregation State
   const [action, setAction] = useState<"join" | "create">("join");
   const [roomId, setRoomId] = useState("");
   const [password, setPassword] = useState("");
@@ -32,16 +31,11 @@ export default function LobbyPage() {
   useEffect(() => {
     const runSecurityCheck = async () => {
       setIsVerifying(true);
-      
-      // 1. CAPTURE THE INVITE ID IMMEDIATELY
       const invitedId = searchParams.get("id");
-
-      // 2. CHECK NICKNAME AUTHENTICATION
       const savedNickname = sessionStorage.getItem("murmur_nickname");
+
       if (!savedNickname) { 
-        // If no nickname, go to Home but PRESERVE the ID in the query string
-        const redirectPath = invitedId ? `/?id=${invitedId}` : "/";
-        router.push(redirectPath); 
+        router.push(invitedId ? `/?id=${invitedId}` : "/"); 
         return; 
       }
 
@@ -50,16 +44,14 @@ export default function LobbyPage() {
         const fpResult = await fpLoad.get();
         const visitorId = fpResult.visitorId;
 
-        // BAN CHECK
         const { data: banData } = await supabase.from("banned_fingerprints").select("*").eq("fingerprint", visitorId).maybeSingle();
         if (banData) {
           setIsBlocked(true);
           setBlockType("BANNED");
-          setBlockReason(banData.reason || "Device excluded.");
+          setBlockReason(banData.reason || "Device Excluded.");
           return;
         }
 
-        // REPORT CHECK
         const { count } = await supabase.from("reports").select("*", { count: 'exact', head: true }).eq("fingerprint", visitorId);
         if (count && count >= 5) {
           setIsBlocked(true);
@@ -68,13 +60,12 @@ export default function LobbyPage() {
           return;
         }
 
-        // 3. AUTO-FILL ROOM ID IF USER CAME FROM AN INVITE LINK
         if (invitedId) {
           setRoomId(invitedId);
           setAction("join");
         }
       } catch (err) {
-        console.error("Security handshake failed:", err);
+        console.error("Handshake failed:", err);
       } finally {
         setIsVerifying(false);
       }
@@ -92,32 +83,28 @@ export default function LobbyPage() {
 
     if (action === "join") {
       if (!existingRoom) {
-        setStatusError("Chat not found. Try creating it instead.");
+        setStatusError("Frequency not found.");
         setIsProcessing(false);
         return;
       }
-      if (existingRoom.is_private) {
-        if (!password || existingRoom.password !== password) {
-          setStatusError("Invalid password for this chat.");
-          setIsProcessing(false);
-          return;
-        }
+      if (existingRoom.is_private && (!password || existingRoom.password !== password)) {
+        setStatusError("Invalid Access Key.");
+        setIsProcessing(false);
+        return;
       }
     } else {
       if (existingRoom) {
-        setStatusError("Room name already reserved. Try something else.");
+        setStatusError("Frequency already reserved.");
         setIsProcessing(false);
         return;
       }
-      const { error: createError } = await supabase.from("rooms").insert([{ 
+      const { error } = await supabase.from("rooms").insert([{ 
         id: cleanId, 
         is_private: password.length > 0, 
         password: password.length > 0 ? password : null 
       }]);
-      if (createError) { setStatusError("Chat Creation failed."); setIsProcessing(false); return; }
+      if (error) { setStatusError("Protocol failed."); setIsProcessing(false); return; }
     }
-
-    // Redirect to the actual chat route
     router.push(`/${cleanId}`);
   };
 
@@ -125,96 +112,112 @@ export default function LobbyPage() {
   if (isBlocked) return <BlockedScreen type={blockType} reason={blockReason} />;
 
   return (
-    <div className="h-[100dvh] bg-zinc-950 text-white flex flex-col overflow-hidden">
+    <div className="h-[100dvh] bg-zinc-950 text-white flex flex-col overflow-hidden selection:bg-purple-500/30">
       <Navbar />
       
-      <main className="flex-1 flex items-center justify-center px-6">
-        <div className="w-full max-w-md">
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
-            <h1 className="text-5xl font-black tracking-tighter italic uppercase italic">Ghost Lobby</h1>
-            <p className="text-zinc-500 text-[10px] uppercase tracking-[0.4em] font-bold mt-2">Secure P2P Entry</p>
+      <main className="flex-1 flex flex-col items-center justify-center px-6 relative">
+        {/* Background Ambient Glows */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-purple-600/10 blur-[120px] pointer-events-none" />
+        
+        <div className="w-full max-w-[400px] z-10">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            className="text-center mb-10"
+          >
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 mb-4">
+            </div>
+            <h1 className="text-4xl font-black tracking-[0.1em] uppercase italic bg-gradient-to-b from-white to-zinc-500 bg-clip-text text-transparent">
+              Chat With friends
+            </h1>
           </motion.div>
 
-          <div className="flex bg-zinc-900/50 p-1 rounded-2xl border border-zinc-800/50 mb-4">
-            <button 
-              onClick={() => { setAction("join"); setStatusError(""); }} 
-              className={cn(
-                "flex-1 py-3 rounded-xl transition-all font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2",
-                action === "join" ? "bg-zinc-800 text-white shadow-lg" : "text-zinc-600 hover:text-zinc-400"
-              )}
-            >
-              <Users className="w-3.5 h-3.5" /> Join
-            </button>
-            <button 
-              onClick={() => { setAction("create"); setStatusError(""); }} 
-              className={cn(
-                "flex-1 py-3 rounded-xl transition-all font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2",
-                action === "create" ? "bg-purple-600 text-white shadow-lg" : "text-zinc-600 hover:text-zinc-400"
-              )}
-            >
-              <Plus className="w-3.5 h-3.5" /> Create
-            </button>
-          </div>
-
-          <motion.div layout className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-[3rem] space-y-6 backdrop-blur-3xl shadow-2xl">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 ml-2">
-                <Hash className="w-3 h-3 text-purple-500" />
-                <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">
-                  {action === "create" ? "Choose Room ID" : "Enter Room ID"}
-                </label>
-              </div>
-              <input 
-                type="text" 
-                placeholder="e.g. testchat"
-                value={roomId}
-                onChange={(e) => { setRoomId(e.target.value); setStatusError(""); }}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-6 py-4 focus:ring-1 focus:ring-purple-500/50 outline-none text-white transition-all placeholder:text-zinc-800" 
-              />
+          <motion.div 
+            layout
+            className="bg-zinc-900/40 border border-white/5 p-6 rounded-[2.5rem] backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
+          >
+            {/* Action Switcher */}
+            <div className="flex bg-black/40 p-1 rounded-2xl border border-white/5 mb-6">
+              <button 
+                onClick={() => setAction("join")} 
+                className={cn(
+                  "flex-1 py-3 rounded-xl transition-all font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2",
+                  action === "join" ? "bg-white text-black" : "text-zinc-500 hover:text-zinc-300"
+                )}
+              >
+                <Users className="w-3.5 h-3.5" /> Join
+              </button>
+              <button 
+                onClick={() => setAction("create")} 
+                className={cn(
+                  "flex-1 py-3 rounded-xl transition-all font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2",
+                  action === "create" ? "bg-purple-600 text-white" : "text-zinc-500 hover:text-zinc-300"
+                )}
+              >
+                <Plus className="w-3.5 h-3.5" /> Create
+              </button>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 ml-2">
-                <Key className="w-3 h-3 text-zinc-500" />
-                <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">
-                  {action === "create" ? "Set password (Optional)" : "Enter password"}
-                </label>
+            <div className="space-y-4">
+              <div className="group relative">
+                <Hash className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 group-focus-within:text-purple-500 transition-colors" />
+                <input 
+                  type="text" 
+                  placeholder="ROOM_ID"
+                  value={roomId}
+                  onChange={(e) => { setRoomId(e.target.value); setStatusError(""); }}
+                  className="w-full bg-black/40 border border-white/5 rounded-2xl pl-14 pr-6 py-5 focus:border-purple-500/50 outline-none text-sm font-mono tracking-wider transition-all placeholder:text-zinc-700" 
+                />
               </div>
-              <input 
-                type="password" 
-                placeholder={action === "create" ? "Leave empty for public" : "Required for private rooms"}
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setStatusError(""); }}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-6 py-4 focus:ring-1 focus:ring-purple-500/50 outline-none text-white transition-all placeholder:text-zinc-800"
-              />
+
+              <div className="group relative">
+                <Key className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 group-focus-within:text-purple-500 transition-colors" />
+                <input 
+                  type="password" 
+                  placeholder="ROOM_PASSWORD"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setStatusError(""); }}
+                  className="w-full bg-black/40 border border-white/5 rounded-2xl pl-14 pr-6 py-5 focus:border-purple-500/50 outline-none text-sm font-mono tracking-wider transition-all placeholder:text-zinc-700"
+                />
+              </div>
+
+              <AnimatePresence mode="wait">
+                {statusError && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }} 
+                    animate={{ opacity: 1, height: "auto" }} 
+                    exit={{ opacity: 0, height: 0 }}
+                    className="flex items-center gap-2 text-red-400 text-[10px] font-bold uppercase tracking-widest px-2"
+                  >
+                    <LayoutGrid className="w-3 h-3" /> {statusError}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <button 
+                onClick={handleEntry} 
+                disabled={isProcessing || !roomId}
+                className={cn(
+                  "w-full font-black py-5 rounded-2xl active:scale-[0.97] transition-all flex items-center justify-center gap-3 uppercase text-[11px] tracking-[0.3em] mt-2",
+                  action === "create" ? "bg-purple-600 text-white shadow-purple-500/10" : "bg-white text-black"
+                )}
+              >
+                {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                  <>
+                    <span>{action === "create" ? "Create Chat" : "Join Chat"}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
             </div>
-
-            {statusError && (
-              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex items-center gap-3 text-red-400 text-[9px] font-black uppercase tracking-widest bg-red-400/5 p-4 rounded-2xl border border-red-400/10">
-                <AlertCircle className="w-4 h-4" /> {statusError}
-              </motion.div>
-            )}
-
-            <button 
-              onClick={handleEntry} 
-              disabled={isProcessing || !roomId}
-              className={cn(
-                "w-full font-black py-5 rounded-[1.8rem] active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase text-[11px] tracking-[0.2em] disabled:opacity-50",
-                action === "create" ? "bg-purple-600 text-white shadow-purple-900/20 shadow-xl" : "bg-white text-black shadow-white/5 shadow-xl"
-              )}
-            >
-              {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : (
-                <>
-                  <span>{action === "create" ? "Initialize Room" : "Enter Chat"}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
           </motion.div>
           
-          <p className="text-center text-[9px] text-zinc-600 font-bold uppercase tracking-[0.3em] mt-8">
-            Ephemeral Storage • Auto-Wipe Active
-          </p>
+          <div className="flex flex-col items-center mt-10 space-y-2 opacity-30 grayscale hover:grayscale-0 transition-all cursor-default">
+             <Zap className="w-4 h-4 text-purple-500" />
+             <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-[0.4em]">
+               P2P Safe model
+             </p>
+          </div>
         </div>
       </main>
     </div>
@@ -223,20 +226,23 @@ export default function LobbyPage() {
 
 function LoadingScreen() {
   return (
-    <div className="h-screen bg-zinc-950 flex flex-col items-center justify-center space-y-4">
-      <Zap className="w-8 h-8 text-purple-500 animate-pulse" />
-      <p className="text-white text-[10px] font-black uppercase tracking-[0.4em]">Scanning Integrity...</p>
+    <div className="h-screen bg-zinc-950 flex flex-col items-center justify-center space-y-6">
+      <div className="relative">
+        <div className="w-12 h-12 border-2 border-purple-500/20 rounded-full animate-ping" />
+        <Zap className="w-6 h-6 text-purple-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+      </div>
+      <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.5em] animate-pulse">Scanning Bio-ID</p>
     </div>
   );
 }
 
 function BlockedScreen({ type, reason }: { type: any, reason: string }) {
   return (
-    <div className="h-screen bg-black text-white flex items-center justify-center p-6 text-center">
-      <div className="max-w-md space-y-6">
-        {type === "BANNED" ? <ShieldAlert className="w-16 h-16 text-red-600 mx-auto" /> : <Clock className="w-16 h-16 text-amber-500 mx-auto" />}
-        <h1 className="text-3xl font-black uppercase italic">{type === "BANNED" ? "Excluded" : "Reviewing"}</h1>
-        <p className="text-zinc-500 text-sm">{reason}</p>
+    <div className="h-screen bg-black text-white flex items-center justify-center p-6">
+      <div className="text-center space-y-6 border border-white/5 p-12 rounded-[3rem] bg-zinc-900/20 backdrop-blur-xl">
+        {type === "BANNED" ? <ShieldAlert className="w-12 h-12 text-red-600 mx-auto" /> : <Clock className="w-12 h-12 text-amber-500 mx-auto" />}
+        <h1 className="text-2xl font-black uppercase italic tracking-tighter">{type === "BANNED" ? "Protocol Exclusion" : "Security Review"}</h1>
+        <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest max-w-[200px] mx-auto leading-relaxed">{reason}</p>
       </div>
     </div>
   );
