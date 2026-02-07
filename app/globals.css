@@ -8,17 +8,29 @@
 }
 
 @layer base {
-  html, body {
-    /* Prevents the 'rubber-band' bouncing effect on iOS */
-    overscroll-behavior-y: none;
-    /* Prevents the grey box flash when tapping buttons on mobile */
+  html {
+    /* Allow the page to grow naturally */
+    height: auto;
+    min-height: 100%;
+    /* Keep it dark */
+    background-color: var(--background);
+  }
+
+  body {
+    /* REMOVED: height: 100dvh and overflow: hidden */
+    min-height: 100vh;
+    width: 100vw;
+    /* Allows scrolling to happen */
+    overflow-y: auto; 
+    overflow-x: hidden;
+    
+    /* Keeps your bounce prevention but only for horizontal */
+    overscroll-behavior-x: none;
+    
+    /* Keeps your mobile polish */
     -webkit-tap-highlight-color: transparent;
     background-color: var(--background);
     color: var(--foreground);
-    /* Use dynamic viewport height to fix the mobile URL bar bug */
-    height: 100dvh;
-    width: 100vw;
-    overflow: hidden;
   }
 }
 
