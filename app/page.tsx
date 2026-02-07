@@ -24,11 +24,21 @@ export default function LandingPage() {
     const identity = `${p}${c}${s}${number}`;
     setName(identity);
     sessionStorage.setItem("murmur_nickname", identity);
+    return identity;
   };
 
   useEffect(() => { 
-    generateIdentity(); 
-  }, []);
+    const currentName = generateIdentity(); 
+    
+    // AUTO-ENTRY LOGIC
+    const inviteId = searchParams.get("id");
+    if (inviteId) {
+      // Ensure the identity is saved before redirecting
+      sessionStorage.setItem("murmur_nickname", currentName);
+      // Directly move to the lobby with the specific room ID
+      router.push(`/lobby?id=${inviteId}`);
+    }
+  }, [searchParams, router]);
 
   const handleProtocolSelection = (path: string) => {
     sessionStorage.setItem("murmur_nickname", name);
@@ -68,12 +78,12 @@ export default function LandingPage() {
                 animate={{ scale: 1, opacity: 1 }}
                 className="inline-block px-4 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[10px] font-black uppercase tracking-widest"
               >
-                Invite Link Detected
+                Syncing with Invite: {searchParams.get("id")}
               </motion.div>
             )}
           </motion.div>
 
-          {/* IDENTITY CARD - REFRESHED FOR MOBILE SCALING */}
+          {/* IDENTITY CARD */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -104,7 +114,7 @@ export default function LandingPage() {
             </button>
 
             <a 
-              href="https://discord.gg/yourlink" 
+              href="https://discord.gg/E5pGCkSB" 
               target="_blank"
               className="flex items-center justify-center gap-3 py-4 rounded-2xl bg-[#5865F2]/10 border border-[#5865F2]/20 text-[#5865F2] font-black text-[10px] uppercase tracking-widest hover:bg-[#5865F2]/20 transition-all active:scale-95"
             >
@@ -114,7 +124,7 @@ export default function LandingPage() {
         </div>
       </main>
 
-      {/* MENU MODAL - OPTIMIZED FOR ALL DEVICES */}
+      {/* MENU MODAL */}
       <AnimatePresence>
         {isMenuOpen && (
           <motion.div 
@@ -159,7 +169,7 @@ export default function LandingPage() {
 
               <div className="p-6 sm:p-8 bg-zinc-950/50 text-center">
                 <p className="text-[9px] sm:text-[10px] text-zinc-600 font-bold uppercase tracking-widest">
-                  Encryption Layer Active • All sessions ephemeral
+                  Safety Layer Active 
                 </p>
               </div>
             </motion.div>
