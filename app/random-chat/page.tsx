@@ -4,12 +4,9 @@ import { useEffect, useState, useRef, Suspense, memo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, LogOut, RefreshCw, Zap, Loader2, Flag, X } from "lucide-react";
+import { Send, LogOut, RefreshCw, Zap, Loader2, Flag, X, UserX, Reply, CornerDownRight } from "lucide-react";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
-/* AD COMPONENT: Optimized with Memo and Ref check to prevent 
-  flickering or re-mounting during chat updates.
-*/
 const AdsterraBanner = memo(() => {
   const adRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
@@ -18,23 +15,12 @@ const AdsterraBanner = memo(() => {
     if (adRef.current && !initialized.current) {
       initialized.current = true;
       const container = adRef.current;
-
       const config = document.createElement("script");
       config.type = "text/javascript";
-      config.innerHTML = `
-        atOptions = {
-          'key' : 'd5b7d02c3eed6fede79ae09ea0e30660',
-          'format' : 'iframe',
-          'height' : 250,
-          'width' : 300,
-          'params' : {}
-        };
-      `;
-
+      config.innerHTML = `atOptions = { 'key' : 'd5b7d02c3eed6fede79ae09ea0e30660', 'format' : 'iframe', 'height' : 250, 'width' : 300, 'params' : {} };`;
       const invoke = document.createElement("script");
       invoke.type = "text/javascript";
       invoke.src = "//www.highperformanceformat.com/d5b7d02c3eed6fede79ae09ea0e30660/invoke.js";
-
       container.appendChild(config);
       container.appendChild(invoke);
     }
@@ -42,16 +28,8 @@ const AdsterraBanner = memo(() => {
 
   return (
     <div className="flex flex-col items-center my-8 py-6 border-y border-zinc-900/50 bg-zinc-950/40 shadow-inner">
-      <span className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.4em] mb-4">
-        Sponsored Message
-      </span>
-      <div 
-        ref={adRef} 
-        className="rounded-xl overflow-hidden border border-zinc-800 bg-black min-h-[250px] min-w-[300px] flex items-center justify-center shadow-2xl"
-      />
-      <p className="text-[8px] text-zinc-800 mt-3 font-bold uppercase tracking-tighter">
-        Secure Ad Link • Ghost Protocol Active
-      </p>
+      <span className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.4em] mb-4">Sponsored Message</span>
+      <div ref={adRef} className="rounded-xl overflow-hidden border border-zinc-800 bg-black min-h-[250px] min-w-[300px] flex items-center justify-center shadow-2xl" />
     </div>
   );
 });
@@ -64,19 +42,30 @@ function ChatContent() {
   
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  const [replyingTo, setReplyingTo] = useState<any>(null);
   const [nickname, setNickname] = useState("");
   const [myFingerprint, setMyFingerprint] = useState<string | null>(null);
   const [partnerNickname, setPartnerNickname] = useState<string | null>(null);
+  const [partnerFingerprint, setPartnerFingerprint] = useState<string | null>(null); // NEW: Track partner FP
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState("");
+  const [hasPartnerLeft, setHasPartnerLeft] = useState(false);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isPartnerTyping]);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "0px";
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 160) + "px";
+    }
+  }, [newMessage]);
 
   useEffect(() => {
     const savedName = sessionStorage.getItem("murmur_nickname");
@@ -98,92 +87,94 @@ function ChatContent() {
       const channel = supabase.channel(`room_${roomid}`, {
         config: { presence: { key: nickname } }
       });
-
       channelRef.current = channel;
 
       channel
         .on("presence", { event: "sync" }, () => {
           const state = channel.presenceState();
           const otherUserKey = Object.keys(state).find(k => k !== nickname);
-          
           if (otherUserKey) {
             const partnerData: any = state[otherUserKey][0];
             setPartnerNickname(otherUserKey);
             setIsPartnerTyping(partnerData?.isTyping || false);
+            setPartnerFingerprint(partnerData?.fp || null); // NEW: Capture partner's FP from presence
           } else {
-            setPartnerNickname(null);
             setIsPartnerTyping(false);
           }
+        })
+        .on("broadcast", { event: "PARTNER_EXITED" }, () => {
+          setPartnerNickname(null);
+          setHasPartnerLeft(true);
         })
         .on("postgres_changes" as any, { 
           event: "INSERT", schema: "public", table: "messages", filter: `room_id=eq.${roomid}` 
         }, (payload: any) => {
           setMessages((prev) => [...prev, payload.new]);
         })
-        .on("postgres_changes" as any, { 
-          event: "DELETE", schema: "public", table: "rooms", filter: `id=eq.${roomid}` 
-        }, () => {
-          // Delayed redirect to prevent UI glitches during signal cleanup
-          setTimeout(() => router.replace("/matching"), 500);
-        })
         .subscribe(async (status: string) => {
           if (status === "SUBSCRIBED") {
-            await channel.track({ 
-              isTyping: false,
-              fp: result.visitorId,
-              online_at: new Date().toISOString() 
-            });
+            await channel.track({ isTyping: false, fp: result.visitorId, online_at: new Date().toISOString() });
           }
         });
     };
 
     setupChat();
+    return () => { if (channelRef.current) supabase.removeChannel(channelRef.current); };
+  }, [roomid, nickname]);
 
-    return () => {
-      if (channelRef.current) supabase.removeChannel(channelRef.current);
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !roomid || !partnerNickname) return;
+    
+    const messageData = {
+      room_id: roomid,
+      nickname: nickname,
+      content: newMessage,
+      reply_to: replyingTo ? { nickname: replyingTo.nickname, content: replyingTo.content } : null
     };
-  }, [roomid, nickname, router]);
 
-  const handleInputChange = (val: string) => {
-    setNewMessage(val);
-    if (channelRef.current) {
-      channelRef.current.track({
-        isTyping: val.length > 0,
-        online_at: new Date().toISOString(),
-        fp: myFingerprint 
-      });
-    }
-  };
-
-  const sendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !roomid) return;
-
-    const content = newMessage;
-    setNewMessage(""); 
-
-    if (channelRef.current) {
-      channelRef.current.track({ isTyping: false, fp: myFingerprint });
-    }
-
-    // Removed the manual 'roomExists' check to prevent race-condition kicks.
-    // The message insert will fail gracefully if the room is gone.
-    await supabase.from("messages").insert([{ 
-      room_id: roomid, 
-      nickname: nickname, 
-      content: content 
-    }]);
+    setNewMessage("");
+    setReplyingTo(null);
+    if (channelRef.current) channelRef.current.track({ isTyping: false, fp: myFingerprint });
+    await supabase.from("messages").insert([messageData]);
   };
 
   const handleSkip = async () => {
     if (!roomid) return;
+    if (channelRef.current) await channelRef.current.send({ type: "broadcast", event: "PARTNER_EXITED" });
     await supabase.from("messages").delete().eq("room_id", roomid);
     await supabase.from("rooms").delete().eq("id", roomid);
     router.replace("/matching"); 
   };
 
+  // NEW: Submit report logic for Admin Dashboard
+  const submitReportAndSkip = async () => {
+    if (!partnerNickname || !partnerFingerprint) {
+      handleSkip();
+      return;
+    }
+
+    const chatContext = messages.slice(-15).map(m => ({
+      nickname: m.nickname,
+      content: m.content
+    }));
+
+    await supabase.from("reports").insert([
+      {
+        fingerprint: partnerFingerprint,
+        reported_user: partnerNickname,
+        reason: reportReason || "Violation of Protocol",
+        chat_log: chatContext
+      }
+    ]);
+
+    setShowReportModal(false);
+    setReportReason("");
+    handleSkip();
+  };
+
   const handleExit = async () => {
     if (roomid) {
+      if (channelRef.current) await channelRef.current.send({ type: "broadcast", event: "PARTNER_EXITED" });
       await supabase.from("messages").delete().eq("room_id", roomid);
       await supabase.from("rooms").delete().eq("id", roomid);
     }
@@ -192,104 +183,160 @@ function ChatContent() {
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-zinc-950 text-zinc-100 overflow-hidden selection:bg-purple-500/30">
+    <div className="flex flex-col h-[100dvh] bg-zinc-950 text-zinc-100 overflow-hidden font-sans">
       
+      {/* REPORT MODAL */}
       <AnimatePresence>
         {showReportModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl w-full max-w-sm shadow-2xl">
-              <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-red-500"><Flag className="w-5 h-5"/> Report User</h3>
-              <div className="space-y-3 mb-6">
-                {["Inappropriate Behavior", "Spamming", "Harassment", "Other"].map((r) => (
-                  <button key={r} onClick={() => setReportReason(r)} className={`w-full p-3 rounded-xl border text-xs font-bold transition-all uppercase tracking-widest ${reportReason === r ? "bg-red-600 border-red-500 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-400"}`}>
-                    {r}
-                  </button>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] w-full max-w-sm shadow-2xl">
+              <h3 className="text-xl font-black mb-4 flex items-center gap-2 text-red-500 uppercase tracking-tighter"><Flag className="w-5 h-5"/> Report Peer</h3>
+              <div className="grid gap-2 mb-6">
+                {["Harassment", "Spam", "Inappropriate", "Nudity"].map((r) => (
+                  <button key={r} onClick={() => setReportReason(r)} className={`w-full p-3 rounded-xl border text-[10px] font-black transition-all uppercase tracking-widest ${reportReason === r ? "bg-red-600 border-red-500 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-400"}`}>{r}</button>
                 ))}
               </div>
-              <div className="flex gap-3">
-                <button onClick={() => { setShowReportModal(false); handleSkip(); }} className="flex-1 bg-white text-black py-3 rounded-xl font-black text-xs uppercase tracking-widest">SUBMIT & SKIP</button>
-                <button onClick={() => setShowReportModal(false)} className="px-5 bg-zinc-800 py-3 rounded-xl font-bold text-sm text-zinc-400"><X className="w-4 h-4" /></button>
+              <div className="flex gap-2">
+                <button onClick={submitReportAndSkip} className="flex-1 bg-white text-black py-4 rounded-xl font-black text-[10px] uppercase tracking-widest">Confirm & Skip</button>
+                <button onClick={() => setShowReportModal(false)} className="px-6 bg-zinc-800 rounded-xl"><X className="w-4 h-4" /></button>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <header className="h-20 shrink-0 border-b border-zinc-800/50 bg-zinc-900/40 backdrop-blur-xl flex items-center justify-between px-4 md:px-8">
+      {/* PARTNER EXIT MODAL */}
+      <AnimatePresence>
+        {hasPartnerLeft && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-black/90 backdrop-blur-2xl">
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2.5rem] w-full max-w-sm text-center shadow-[0_0_50px_rgba(0,0,0,0.4)]">
+              <UserX className="w-12 h-12 text-purple-500 mx-auto mb-6" />
+              <h3 className="text-xl font-black uppercase tracking-tighter mb-2">Signal Lost</h3>
+              <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-8 leading-relaxed">The other peer has left the frequency.</p>
+              <div className="space-y-3">
+                <button onClick={handleSkip} className="w-full bg-white text-black py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em]">New Peer</button>
+                <button onClick={handleExit} className="w-full bg-zinc-800 text-zinc-400 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em]">Lobby</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* HEADER */}
+      <header className="h-16 md:h-20 shrink-0 border-b border-zinc-900 bg-zinc-950/50 backdrop-blur-xl flex items-center justify-between px-4 md:px-8 z-50">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-purple-600/20 rounded-xl flex items-center justify-center border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.2)]">
-            <Zap className="w-5 h-5 text-purple-400" />
+          <div className="w-10 h-10 bg-gradient-to-tr from-purple-600 to-blue-600 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(147,51,234,0.3)]">
+            <Zap className="w-5 h-5 text-white" />
           </div>
           <div className="min-w-0">
-            <h2 className="font-bold text-sm md:text-lg truncate max-w-[150px] md:max-w-none uppercase tracking-tighter">
-                {partnerNickname || "Connecting..."}
-            </h2>
-            <div className="flex items-center gap-2">
-              <div className={`w-1.5 h-1.5 rounded-full ${partnerNickname ? "bg-green-500 animate-pulse" : "bg-zinc-600"}`} />
-              <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
-                {partnerNickname ? "SECURE" : "ENCRYPTING"}
-              </span>
-            </div>
+            <h2 className="font-black text-sm md:text-lg truncate tracking-tighter uppercase leading-none">{partnerNickname || "Syncing..."}</h2>
+            <span className="text-[8px] md:text-[10px] text-green-500 font-bold uppercase tracking-widest flex items-center gap-1 mt-1">
+              <span className="w-1 h-1 bg-green-500 rounded-full animate-pulse" /> Live Frequency
+            </span>
           </div>
         </div>
+
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowReportModal(true)} className="h-10 w-10 flex items-center justify-center rounded-xl border border-zinc-800 text-zinc-600 hover:text-red-500 transition-all"><Flag className="w-4 h-4" /></button>
-          <button onClick={handleSkip} className="h-10 px-4 rounded-xl bg-white text-black text-xs font-black flex items-center gap-2 active:scale-95 transition-all"><RefreshCw className="w-4 h-4" /> SKIP</button>
-          <button onClick={handleExit} className="h-10 w-10 flex items-center justify-center rounded-xl border border-zinc-800 text-zinc-500 active:scale-95 transition-all"><LogOut className="w-4 h-4" /></button>
+          <button onClick={() => setShowReportModal(true)} className="p-3 rounded-xl border border-zinc-800 text-zinc-500 hover:text-red-500 transition-all">
+            <Flag className="w-4 h-4" />
+          </button>
+          <button onClick={handleSkip} className="flex items-center gap-2 h-10 px-4 rounded-xl bg-white text-black font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all">
+            <RefreshCw className="w-4 h-4" /> SKIP
+          </button>
+          <button onClick={handleExit} className="p-3 rounded-xl border border-zinc-800 text-zinc-400 hover:bg-zinc-900 transition-all">
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 no-scrollbar overscroll-none">
-        <AnimatePresence>
-          {!partnerNickname && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center h-full text-zinc-600 space-y-4">
-              <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Establishing link...</p>
-            </motion.div>
-          )}
+      {/* MESSAGES AREA */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 no-scrollbar scroll-smooth">
+        <AnimatePresence mode="popLayout">
+          {messages.map((msg, i) => {
+            const isMe = msg.nickname === nickname;
+            return (
+              <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                <div className={`max-w-[85%] md:max-w-[70%] group relative`}>
+                  {/* Reply Action Button */}
+                  <button 
+                    onClick={() => setReplyingTo(msg)}
+                    className={`absolute top-1/2 -translate-y-1/2 p-2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity z-10 ${isMe ? "-left-12" : "-right-12"}`}
+                  >
+                    <Reply className="w-4 h-4" />
+                  </button>
+
+                  <span className={`text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1 block ${isMe ? "text-right" : ""}`}>
+                    {msg.nickname}
+                  </span>
+
+                  {/* Message Bubble */}
+                  <div className={`relative px-5 py-3 rounded-[1.5rem] text-[15px] leading-relaxed shadow-2xl transition-all ${
+                    isMe 
+                    ? "bg-gradient-to-br from-purple-600 to-purple-700 text-white rounded-tr-none" 
+                    : "bg-zinc-900/40 border border-zinc-800/50 backdrop-blur-md rounded-tl-none ring-1 ring-purple-500/10"
+                  }`}>
+                    {/* Render Reply Preview if message is a reply */}
+                    {msg.reply_to && (
+                      <div className={`mb-2 p-2 rounded-lg border-l-2 text-[11px] opacity-80 ${isMe ? "bg-white/10 border-white/30" : "bg-purple-500/10 border-purple-500/50"}`}>
+                        <p className="font-black uppercase tracking-tighter text-[9px] mb-0.5">@{msg.reply_to.nickname}</p>
+                        <p className="truncate italic">"{msg.reply_to.content}"</p>
+                      </div>
+                    )}
+                    {msg.content}
+                  </div>
+                </div>
+                {(i + 1) % 10 === 0 && <AdsterraBanner />}
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
-
-        {messages.map((msg, i) => (
-          <div key={i}>
-            <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-              className={`max-w-[85%] md:max-w-[75%] flex flex-col ${msg.nickname === nickname ? "ml-auto items-end" : "items-start"}`}>
-              <span className="text-[10px] font-bold text-zinc-500 mb-1 uppercase tracking-tighter">{msg.nickname}</span>
-              <div className={`px-4 py-3 rounded-2xl text-[15px] md:text-[16px] shadow-lg leading-relaxed ${
-                msg.nickname === nickname ? "bg-purple-600 text-white rounded-tr-none" : "bg-zinc-900 border border-zinc-800 rounded-tl-none"
-              }`}>
-                {msg.content}
-              </div>
-            </motion.div>
-
-            {(i + 1) % 10 === 0 && <AdsterraBanner />}
-          </div>
-        ))}
-        <div ref={scrollRef} className="h-4" />
+        <div ref={scrollRef} className="h-2" />
       </div>
 
-      <div className="shrink-0 p-4 md:p-8 bg-zinc-950/50 backdrop-blur-md border-t border-zinc-900/80 safe-bottom">
-        <div className="max-w-5xl mx-auto">
+      {/* INPUT AREA */}
+      <div className="p-4 md:p-8 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent">
+        <div className="max-w-4xl mx-auto">
+          {/* Reply Context Bar */}
           <AnimatePresence>
-            {isPartnerTyping && (
-              <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                className="text-[10px] text-purple-400 font-bold uppercase tracking-widest mb-2 ml-1">
-                Partner is typing...
+            {replyingTo && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 border-b-0 rounded-t-2xl p-3 flex items-center justify-between">
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <CornerDownRight className="w-4 h-4 text-purple-500 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-black text-purple-500 uppercase tracking-widest">Replying to {replyingTo.nickname}</p>
+                    <p className="text-xs text-zinc-400 truncate italic">{replyingTo.content}</p>
+                  </div>
+                </div>
+                <button onClick={() => setReplyingTo(null)} className="p-1.5 hover:bg-zinc-800 rounded-lg"><X className="w-4 h-4" /></button>
               </motion.div>
             )}
           </AnimatePresence>
-          <form onSubmit={sendMessage} className="relative flex items-center gap-2">
-            <input 
-              type="text" 
+
+          <div className={`relative flex items-end gap-2 bg-zinc-900 border border-zinc-800 p-2 transition-all duration-300 ${replyingTo ? "rounded-b-[1.5rem]" : "rounded-[1.5rem] shadow-2xl focus-within:ring-4 focus-within:ring-purple-500/10"}`}>
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              autoFocus
               disabled={!partnerNickname}
-              value={newMessage} 
-              onChange={(e) => handleInputChange(e.target.value)} 
-              placeholder={partnerNickname ? "Type a message..." : "Waiting for connection..."} 
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl pl-4 pr-14 py-4 outline-none text-[16px] text-white focus:border-purple-500/50 transition-all disabled:opacity-30" 
+              value={newMessage}
+              onChange={(e) => {
+                setNewMessage(e.target.value);
+                if (channelRef.current) channelRef.current.track({ isTyping: e.target.value.length > 0, fp: myFingerprint });
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+              placeholder={partnerNickname ? "Message..." : "Searching..."}
+              className="flex-1 bg-transparent border-none outline-none text-[15px] px-4 py-3 resize-none min-h-[44px] max-h-[160px] scrollbar-none placeholder:text-zinc-700"
             />
-            <button type="submit" disabled={!partnerNickname || !newMessage.trim()} className="absolute right-2 p-3 bg-purple-600 text-white rounded-xl active:scale-90 disabled:opacity-0 transition-all shadow-lg">
+            <button onClick={sendMessage} disabled={!partnerNickname || !newMessage.trim()} className="p-3 bg-white text-black rounded-xl hover:scale-105 active:scale-95 disabled:opacity-0 transition-all shadow-xl">
               <Send className="w-5 h-5" />
             </button>
-          </form>
+          </div>
+          <div className="flex justify-between items-center mt-3 px-2">
+            <span className="text-[8px] text-zinc-800 font-black uppercase tracking-[0.3em]">Peer-to-Peer Secure</span>
+            {isPartnerTyping && (
+              <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[9px] text-purple-500/60 font-black uppercase animate-pulse">Peer is typing...</motion.span>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -298,7 +345,7 @@ function ChatContent() {
 
 export default function RandomChat() {
   return (
-    <Suspense fallback={<div className="h-[100dvh] bg-zinc-950 flex items-center justify-center text-zinc-500"><Loader2 className="animate-spin" /></div>}>
+    <Suspense fallback={<div className="h-[100dvh] bg-zinc-950 flex items-center justify-center"><Loader2 className="animate-spin text-purple-600" /></div>}>
       <ChatContent />
     </Suspense>
   );
