@@ -1,138 +1,170 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Megaphone, ExternalLink, MessageCircle, 
-  Rocket, ShieldAlert, ChevronDown 
-} from "lucide-react";
+import { Megaphone, ExternalLink, MessageCircle, Rocket, ChevronDown, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Mock Data - You can replace these with real Adsterra/Partner banners
-const AD_BANNERS = [
-  { id: 1, title: "Secure VPN Protocol", desc: "Encrypt your node now.", color: "from-blue-600 to-indigo-900" },
-  { id: 2, title: "Shadow Marketplace", desc: "Pure peer-to-peer exchange.", color: "from-purple-600 to-pink-900" },
-  { id: 3, title: "Zero-Log Browser", desc: "No traces. No history.", color: "from-emerald-600 to-teal-900" },
-  { id: 4, title: "Cyber Security Audit", desc: "Protect your digital ghost.", color: "from-orange-600 to-red-900" },
-];
+/**
+ * AD COMPONENT
+ * Handles the manual injection of Adsterra scripts into the DOM
+ */
+function AdsterraBanner({ instanceId }: { instanceId: number }) {
+  const adRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (adRef.current && adRef.current.innerHTML === "") {
+      const adKey = "d5b7d02c3eed6fede79ae09ea0e30660";
+      
+      const configScript = document.createElement("script");
+      configScript.innerHTML = `
+        atOptions = {
+          'key' : '${adKey}',
+          'format' : 'iframe',
+          'height' : 250,
+          'width' : 300,
+          'params' : {}
+        };
+      `;
+      
+      const invokeScript = document.createElement("script");
+      invokeScript.src = `https://www.highperformanceformat.com/${adKey}/invoke.js`;
+      invokeScript.async = true;
+      invokeScript.type = "text/javascript";
+      
+      adRef.current.appendChild(configScript);
+      adRef.current.appendChild(invokeScript);
+    }
+  }, [instanceId]);
+
+  return (
+    <div className="flex flex-col items-center justify-center w-full py-8 bg-zinc-900/10 rounded-[2.5rem] border border-white/5 min-h-[320px] shadow-inner">
+      <div className="mb-4 flex items-center gap-2">
+        <ShieldCheck className="w-3 h-3 text-zinc-800" />
+        <span className="text-[8px] font-black text-zinc-800 uppercase tracking-[0.4em]">Verified Ad Feed</span>
+      </div>
+      <div ref={adRef} className="rounded-lg overflow-hidden shadow-2xl border border-white/5" />
+    </div>
+  );
+}
 
 export default function PromotionsPage() {
-  const [activeAds, setActiveAds] = useState([AD_BANNERS[0]]);
-  
+  const [visibleAds, setVisibleAds] = useState([1]);
+  const DISCORD_LINK = "https://discord.gg/E5pGCkSB";
+
   const addNextPromotion = () => {
-    // Cycles through the array or adds random ones
-    const nextAd = AD_BANNERS[activeAds.length % AD_BANNERS.length];
-    // Create a unique instance of the ad
-    setActiveAds([...activeAds, { ...nextAd, id: Date.now() }]);
-    
-    // Smooth scroll to bottom
+    setVisibleAds(prev => [...prev, Date.now()]);
     setTimeout(() => {
       window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-    }, 100);
+    }, 200);
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#050505] text-zinc-100 font-sans selection:bg-red-500/30">
+    <div className="min-h-screen w-full bg-[#050505] text-zinc-100 font-sans overflow-y-auto selection:bg-red-500/30">
       
-      {/* HEADER */}
-      <div className="max-w-4xl mx-auto px-6 pt-12 pb-8 border-b border-white/5">
-        <div className="flex items-center gap-4 mb-2">
-          <div className="p-3 bg-red-500/10 rounded-2xl border border-red-500/20">
-            <Megaphone className="w-6 h-6 text-red-500" />
+      {/* HEADER SECTION */}
+      <div className="max-w-4xl mx-auto px-6 pt-16 pb-10 border-b border-white/5">
+        <motion.div 
+          initial={{ opacity: 0, x: -20 }} 
+          animate={{ opacity: 1, x: 0 }}
+          className="flex items-center gap-5"
+        >
+          <div className="p-4 bg-red-500/10 rounded-2xl border border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.1)]">
+            <Megaphone className="w-7 h-7 text-red-500" />
           </div>
           <div>
-            <h1 className="text-3xl font-black italic uppercase tracking-tighter">Sponsor Deck</h1>
-            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em]">Encrypted Feed</p>
+            <h1 className="text-4xl font-black italic uppercase tracking-tighter">Sponsor Deck</h1>
+            <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-[0.5em] mt-1">Authorized Commercial Stream</p>
           </div>
-        </div>
+        </motion.div>
       </div>
 
-      {/* AD FEED */}
-      <main className="max-w-4xl mx-auto px-6 py-10 space-y-6">
+      <main className="max-w-4xl mx-auto px-6 py-12 space-y-12">
         <AnimatePresence mode="popLayout">
-          {activeAds.map((ad, idx) => (
+          {visibleAds.map((id) => (
             <motion.div
-              key={ad.id}
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              className={cn(
-                "relative group overflow-hidden rounded-[2rem] border border-white/5 bg-zinc-900/20 p-8 flex flex-col sm:flex-row items-center justify-between gap-6",
-                "hover:border-white/10 transition-all duration-500"
-              )}
+              key={id}
+              initial={{ opacity: 0, y: 30, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.5 }}
             >
-              {/* Background Glow */}
-              <div className={cn("absolute inset-0 bg-gradient-to-r opacity-5 group-hover:opacity-10 transition-opacity", ad.color)} />
-              
-              <div className="relative z-10 flex items-center gap-6">
-                <div className={cn("w-16 h-16 rounded-2xl bg-gradient-to-br flex items-center justify-center shrink-0 shadow-2xl", ad.color)}>
-                  <ShieldAlert className="text-white w-8 h-8" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-black uppercase italic tracking-tight">{ad.title}</h3>
-                  <p className="text-zinc-500 text-sm font-medium">{ad.desc}</p>
-                </div>
-              </div>
-
-              <button className="relative z-10 px-8 py-4 bg-white text-black rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-500 hover:text-white transition-all active:scale-95 shrink-0">
-                Access Node
-              </button>
+              <AdsterraBanner instanceId={id} />
             </motion.div>
           ))}
         </AnimatePresence>
 
-        {/* ADD NEXT BUTTON */}
-        <div className="py-10 flex flex-col items-center gap-4">
+        {/* LOAD MORE */}
+        <div className="py-16 flex flex-col items-center gap-6">
           <button 
             onClick={addNextPromotion}
-            className="group flex flex-col items-center gap-2 text-zinc-600 hover:text-white transition-colors"
+            className="group flex flex-col items-center gap-4 text-zinc-700 hover:text-white transition-all"
           >
-            <span className="text-[10px] font-black uppercase tracking-[0.4em]">Next Frequency</span>
-            <div className="p-4 rounded-full border border-white/5 group-hover:border-red-500/50 group-hover:bg-red-500/10 transition-all">
-              <ChevronDown className="w-6 h-6 animate-bounce" />
+            <span className="text-[10px] font-black uppercase tracking-[0.5em]">Sync Next Sponsor</span>
+            <div className="p-5 rounded-full border border-white/5 group-hover:border-red-500/50 group-hover:bg-red-500/10 transition-all shadow-xl active:scale-90">
+              <ChevronDown className="w-6 h-6 animate-bounce text-red-500" />
             </div>
           </button>
         </div>
 
-        <hr className="border-white/5 my-20" />
+        <hr className="border-white/5 my-12" />
 
-        {/* BOTTOM CALL TO ACTION */}
-        <section className="grid sm:grid-cols-2 gap-6 pb-20">
-          {/* ORG PROMOTION */}
-          <div className="bg-zinc-900/40 border border-white/5 rounded-[2.5rem] p-8 flex flex-col justify-between items-start gap-8">
+        {/* PROMOTION CTAS */}
+        <section className="grid sm:grid-cols-2 gap-8 pb-32">
+          
+          {/* CONTACT/JOB BOX - NOW REDIRECTS TO DISCORD */}
+          <motion.div 
+            whileHover={{ y: -5 }}
+            className="bg-zinc-900/30 border border-white/5 rounded-[3rem] p-10 flex flex-col justify-between items-start gap-10 hover:border-red-500/20 transition-all"
+          >
             <div>
-              <Rocket className="text-red-500 w-10 h-10 mb-4" />
-              <h4 className="text-xl font-black uppercase italic tracking-tighter">Promote Your Org</h4>
-              <p className="text-zinc-500 text-xs leading-relaxed mt-2">
-                Gain instant visibility. Your banner will be broadcasted to thousands of anonymous nodes globally.
-              </p>
-            </div>
-            <button className="w-full py-4 bg-zinc-800 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all">
-              Contact Admin
-            </button>
-          </div>
-
-          {/* DISCORD SYNC */}
-          <div className="bg-[#5865F2]/5 border border-[#5865F2]/20 rounded-[2.5rem] p-8 flex flex-col justify-between items-start gap-8">
-            <div>
-              <MessageCircle className="text-[#5865F2] w-10 h-10 mb-4" />
-              <h4 className="text-xl font-black uppercase italic tracking-tighter">Official Discord</h4>
-              <p className="text-zinc-500 text-xs leading-relaxed mt-2">
-                Join the underground network. Chat with the devs and the community in real-time.
+              <div className="w-12 h-12 bg-red-500/10 rounded-2xl flex items-center justify-center mb-6">
+                <Rocket className="text-red-500 w-6 h-6" />
+              </div>
+              <h4 className="text-2xl font-black uppercase italic tracking-tighter">Branding & Jobs</h4>
+              <p className="text-zinc-500 text-xs leading-relaxed mt-4">
+                To apply for job positions or discuss branding/partnerships, join our HQ. All business inquiries are handled via our <span className="text-white font-bold">#Support-Tickets</span> channel.
               </p>
             </div>
             <a 
-              href="https://discord.gg/E5pGCkSB" 
+              href={DISCORD_LINK}
               target="_blank"
-              className="w-full py-4 bg-[#5865F2] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all text-center flex items-center justify-center gap-2"
+              className="w-full py-5 bg-white text-black rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all text-center flex items-center justify-center gap-2"
+            >
+              Contact Team <ExternalLink className="w-3 h-3" />
+            </a>
+          </motion.div>
+
+          {/* DISCORD BOX */}
+          <motion.div 
+            whileHover={{ y: -5 }}
+            className="bg-[#5865F2]/5 border border-[#5865F2]/20 rounded-[3rem] p-10 flex flex-col justify-between items-start gap-10 hover:border-[#5865F2]/40 transition-all"
+          >
+            <div>
+              <div className="w-12 h-12 bg-[#5865F2]/10 rounded-2xl flex items-center justify-center mb-6">
+                <MessageCircle className="text-[#5865F2] w-6 h-6" />
+              </div>
+              <h4 className="text-2xl font-black uppercase italic tracking-tighter">Join Community</h4>
+              <p className="text-zinc-500 text-xs leading-relaxed mt-4">
+                Connect with developers and the elite community. Direct access to dev-logs, beta protocols, and global announcements.
+              </p>
+            </div>
+            <a 
+              href={DISCORD_LINK}
+              target="_blank"
+              className="w-full py-5 bg-[#5865F2] text-white rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all text-center flex items-center justify-center gap-3"
             >
               Enter Hub <ExternalLink className="w-3 h-3" />
             </a>
-          </div>
+          </motion.div>
         </section>
       </main>
 
-      {/* FOOTER PADDING FOR MOBILE */}
-      <div className="h-20" />
+      <style jsx global>{`
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #050505; }
+        ::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #ef4444; }
+      `}</style>
     </div>
   );
 }
