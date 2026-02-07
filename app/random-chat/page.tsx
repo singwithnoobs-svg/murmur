@@ -80,10 +80,22 @@ function ChatContent() {
     if (!roomid || !nickname) return;
 
     const setupChat = async () => {
+      // 1. Get Fingerprint
       const fpLoad = await FingerprintJS.load();
       const result = await fpLoad.get();
       setMyFingerprint(result.visitorId);
 
+      // 2. REGISTER ROOM (CRITICAL FIX)
+      // This ensures the 'rooms' table has the ID so 'messages' doesn't fail foreign key checks.
+      const { error: roomError } = await supabase
+        .from("rooms")
+        .upsert({ id: roomid }, { onConflict: 'id' });
+
+      if (roomError) {
+        console.error("Room Sync Error:", roomError.message);
+      }
+
+      // 3. Setup Channel
       const channel = supabase.channel(`room_${roomid}`, {
         config: { presence: { key: nickname } }
       });
@@ -97,7 +109,7 @@ function ChatContent() {
             const partnerData: any = state[otherUserKey][0];
             setPartnerNickname(otherUserKey);
             setIsPartnerTyping(partnerData?.isTyping || false);
-            setPartnerFingerprint(partnerData?.fp || null); // NEW: Capture partner's FP from presence
+            setPartnerFingerprint(partnerData?.fp || null);
           } else {
             setIsPartnerTyping(false);
           }
@@ -107,7 +119,11 @@ function ChatContent() {
           setHasPartnerLeft(true);
         })
         .on("postgres_changes" as any, { 
-          event: "INSERT", schema: "public", table: "messages", filter: `room_id=eq.${roomid}` 
+          event: "INSERT", 
+          schema: "public", 
+          table: "messages", 
+          // Use a template string carefully for the filter
+          filter: `room_id=eq.${roomid}` 
         }, (payload: any) => {
           setMessages((prev) => [...prev, payload.new]);
         })
