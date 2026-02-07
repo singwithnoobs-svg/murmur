@@ -54,7 +54,7 @@ export default function LandingPage() {
     { name: "Random Chat", icon: <Hash className="w-5 h-5" />, path: "/matching", desc: "Instant match with a stranger" },
     { name: "Chat with Friends", icon: <Users className="w-5 h-5" />, path: "/lobby", desc: "Private rooms via invite link" },
     { name: "Global Chat Rooms", icon: <Globe className="w-5 h-5" />, path: "/livechat", desc: "Public frequencies" },
-    { name: "Community Forum", icon: <MessageSquare className="w-5 h-5" />, path: "/forum", desc: "Permanent discussions" },
+    { name: "Community Polls", icon: <MessageSquare className="w-5 h-5" />, path: "/polls", desc: "Permanent discussions" },
   ];
 
   return (
