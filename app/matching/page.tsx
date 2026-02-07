@@ -4,19 +4,19 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { motion } from "framer-motion";
-import { X, ShieldX, Clock, Zap, Loader2 } from "lucide-react";
+import { X, Zap } from "lucide-react";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 export default function MatchingPage() {
   const router = useRouter();
   const [nickname, setNickname] = useState("");
   const [status, setStatus] = useState("Initializing Ghost Protocol...");
-  const [onlineCount, setOnlineCount] = useState(0);
   const [isBanned, setIsBanned] = useState(false);
   const [banDetails, setBanDetails] = useState<any>(null);
   
   const protocolStarted = useRef(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const channelRef = useRef<any>(null);
 
   useEffect(() => {
     const savedName = sessionStorage.getItem("murmur_nickname");
@@ -24,14 +24,29 @@ export default function MatchingPage() {
     setNickname(savedName);
     checkBanAndStart(savedName);
 
+    // CLEANUP: If user closes tab or leaves
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      cleanup();
     };
   }, []);
 
+  const cleanup = async () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (nickname) {
+      // Deletes BOTH the signal and the matchmaking record for this nickname
+      await supabase.from("matchmaking")
+        .delete()
+        .or(`nickname.eq.${nickname},partner_found.eq.${nickname}`);
+    }
+    if (channelRef.current) supabase.removeChannel(channelRef.current);
+  };
+
   const checkBanAndStart = async (name: string) => {
     const fp = await (await FingerprintJS.load()).get();
-    const { data } = await supabase.from("banned_fingerprints").select("*").eq("fingerprint", fp.visitorId).maybeSingle();
+    const { data } = await supabase.from("banned_fingerprints")
+      .select("*")
+      .eq("fingerprint", fp.visitorId)
+      .maybeSingle();
 
     if (data && (!data.expires_at || new Date(data.expires_at) > new Date())) {
       setBanDetails(data);
@@ -48,13 +63,12 @@ export default function MatchingPage() {
     try {
       setStatus("Scanning Frequencies...");
       
-      // 1. Look for a waiting Host (Exclude signals)
+      // 1. Attempt to find an existing signal (Waiters)
       const { data: queue } = await supabase
         .from("matchmaking")
         .select("*")
         .is("partner_found", null)
         .neq("nickname", name) 
-        .not("nickname", "ilike", "SIGNAL_%")
         .order("created_at", { ascending: true })
         .limit(1);
 
@@ -62,13 +76,20 @@ export default function MatchingPage() {
         const partner = queue[0];
         const roomId = `room_${Math.random().toString(36).substring(2, 12)}`;
 
-        // Atomic claim
-        const { data: claimed } = await supabase.from("matchmaking").delete().eq("id", partner.id).select();
+        // Attempt to "Snap up" the partner
+        const { data: claimed } = await supabase
+          .from("matchmaking")
+          .delete()
+          .eq("id", partner.id)
+          .select();
 
         if (claimed && claimed.length > 0) {
           setStatus("Link Established!");
+          
+          // Create the room
           await supabase.from("rooms").insert([{ id: roomId, created_by: name }]);
-          // Create a signal record for the host
+          
+          // Leave a "Signal" for the partner to find the room
           await supabase.from("matchmaking").insert([{ 
             nickname: `SIGNAL_${partner.nickname}`, 
             partner_found: partner.nickname, 
@@ -77,15 +98,20 @@ export default function MatchingPage() {
           
           router.push(`/random-chat?id=${roomId}`);
         } else {
+          // If claim failed, retry immediately
           protocolStarted.current = false;
-          setTimeout(() => startMatchmaking(name), 500);
+          startMatchmaking(name);
         }
       } else {
-        // 2. No one waiting, become Host
+        // 2. No one found, Create our own signal and wait
         setStatus("Broadcasting Signal...");
+        
+        // Ensure old records of me are gone before inserting
+        await supabase.from("matchmaking").delete().eq("nickname", name);
         await supabase.from("matchmaking").insert([{ nickname: name }]);
 
         intervalRef.current = setInterval(async () => {
+          // Look for the "SIGNAL_" packet someone sent us
           const { data: signal } = await supabase
             .from("matchmaking")
             .select("*")
@@ -95,8 +121,12 @@ export default function MatchingPage() {
           if (signal?.room_id) {
             const finalRoomId = signal.room_id;
             clearInterval(intervalRef.current!);
-            // Delete signal ONLY, not the room
+            
+            // Clean up our signal packet
             await supabase.from("matchmaking").delete().eq("id", signal.id);
+            // Clean up our entry in the queue
+            await supabase.from("matchmaking").delete().eq("nickname", name);
+            
             router.push(`/random-chat?id=${finalRoomId}`);
           }
         }, 1500);
@@ -108,8 +138,7 @@ export default function MatchingPage() {
   };
 
   const abort = async () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    await supabase.from("matchmaking").delete().eq("nickname", nickname);
+    await cleanup();
     router.push("/");
   };
 
@@ -117,6 +146,7 @@ export default function MatchingPage() {
 
   return (
     <div className="h-[100dvh] bg-zinc-950 text-zinc-100 flex flex-col items-center justify-center p-6 overflow-hidden">
+      {/* ... (Your existing UI remains the same) ... */}
       <div className="relative z-10 w-full max-w-sm flex flex-col items-center">
         <div className="relative mb-12">
           <motion.div animate={{ rotate: 360 }} transition={{ duration: 8, repeat: Infinity, ease: "linear" }} className="w-32 h-32 border-2 border-dashed border-zinc-800 rounded-full" />
