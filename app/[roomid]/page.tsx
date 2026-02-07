@@ -45,14 +45,14 @@ export default function ChatRoom() {
   const [newMessage, setNewMessage] = useState("");
   const [nickname, setNickname] = useState("");
   const [myFingerprint, setMyFingerprint] = useState<string | null>(null);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false); // Used for Exit Modal
   const [copied, setCopied] = useState(false);
   const [onlineCount, setOnlineCount] = useState(0);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState("");
-  const [extraReason, setExtraReason] = useState(""); // NEW: Extra reason state
+  const [extraReason, setExtraReason] = useState(""); 
   const [isReporting, setIsReporting] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -103,7 +103,11 @@ export default function ChatRoom() {
     return () => { if (channelRef.current) supabase.removeChannel(channelRef.current); };
   }, [roomid, nickname]);
 
-  // FIXED: Logic to include FP in logs so Admin Dashboard can click them
+  const handleExit = () => {
+    sessionStorage.removeItem("murmur_nickname");
+    router.push("/");
+  };
+
   const submitReport = async () => {
     if (!reportReason || isReporting) return;
     setIsReporting(true);
@@ -114,11 +118,10 @@ export default function ChatRoom() {
       const targetNickname = lastOtherMessage?.nickname || "Unknown";
       const targetFp = presence[targetNickname]?.[0]?.fp || "Fingerprint_Not_Captured";
 
-      // IMPORTANT: Map FP to EACH log entry so Admin can click ANY name in the log
       const logs = messages.slice(-30).map(msg => ({
         nickname: msg.nickname,
         content: msg.content,
-        fp: presence[msg.nickname]?.[0]?.fp || null // This allows Admin to "Target" anyone in history
+        fp: presence[msg.nickname]?.[0]?.fp || null 
       }));
 
       const finalReason = extraReason.trim() 
@@ -176,7 +179,28 @@ export default function ChatRoom() {
   return (
     <div className="flex flex-col h-[100dvh] bg-[#050505] text-zinc-100 overflow-hidden font-sans">
       
-      {/* IMPROVED REPORT MODAL */}
+      {/* EXIT CONFIRMATION MODAL */}
+      <AnimatePresence>
+        {showConfirm && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="bg-zinc-900 border border-white/5 p-8 rounded-[2.5rem] w-full max-w-sm shadow-2xl text-center">
+              <LogOut className="w-12 h-12 text-zinc-500 mx-auto mb-4" />
+              <h3 className="text-xl font-black mb-2 uppercase tracking-tighter italic">Sever Connection?</h3>
+              <p className="text-zinc-500 text-xs mb-8 uppercase tracking-widest font-bold">This node will be deactivated.</p>
+              <div className="flex gap-3">
+                <button onClick={handleExit} className="flex-1 bg-red-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95">
+                  Confirm Exit
+                </button>
+                <button onClick={() => setShowConfirm(false)} className="px-6 bg-zinc-800 rounded-2xl border border-zinc-700 hover:bg-zinc-700 transition-all text-zinc-400 font-bold text-[10px] uppercase tracking-widest">
+                  Stay
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* REPORT MODAL */}
       <AnimatePresence>
         {showReportModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
@@ -193,7 +217,6 @@ export default function ChatRoom() {
                 ))}
               </div>
 
-              {/* NEW: EXTRA REASON INPUT */}
               <div className="mb-8">
                 <p className="text-[8px] font-black text-zinc-600 uppercase mb-2 ml-1">Additional Evidence / Notes</p>
                 <textarea 
@@ -215,9 +238,6 @@ export default function ChatRoom() {
         )}
       </AnimatePresence>
 
-      {/* ... Rest of your component (Header, Chat Area, Input Bar) exactly as it was ... */}
-      {/* Make sure to keep your existing Header, Messages mapping, and Input Bar code here */}
-      
       {/* HEADER */}
       <header className="h-20 border-b border-white/5 bg-zinc-950/50 backdrop-blur-xl flex items-center justify-between px-4 md:px-8 shrink-0 z-50">
         <div className="flex items-center gap-4 min-w-0">
@@ -243,7 +263,8 @@ export default function ChatRoom() {
             {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />} 
             <span className="hidden sm:inline">{copied ? "Copied" : "Invite"}</span>
           </button>
-          <button onClick={() => setShowConfirm(true)} className="h-11 w-11 flex items-center justify-center rounded-xl border border-white/5 text-zinc-500 hover:bg-zinc-900 transition-all"><LogOut className="w-4 h-4" /></button>
+          {/* EXIT BUTTON TRIGGER */}
+          <button onClick={() => setShowConfirm(true)} className="h-11 w-11 flex items-center justify-center rounded-xl border border-white/5 text-zinc-500 hover:bg-zinc-900 transition-all active:scale-90"><LogOut className="w-4 h-4" /></button>
         </div>
       </header>
 
@@ -271,6 +292,17 @@ export default function ChatRoom() {
               </div>
             );
           })}
+          {/* Typing indicator */}
+          {typingUsers.length > 0 && (
+             <div className="flex gap-2 items-center text-[9px] font-black text-zinc-600 uppercase tracking-widest">
+                <div className="flex gap-1">
+                   <span className="w-1 h-1 bg-zinc-600 rounded-full animate-bounce" />
+                   <span className="w-1 h-1 bg-zinc-600 rounded-full animate-bounce [animation-delay:0.2s]" />
+                   <span className="w-1 h-1 bg-zinc-600 rounded-full animate-bounce [animation-delay:0.4s]" />
+                </div>
+                Nodes Transmitting...
+             </div>
+          )}
           <div ref={scrollRef} className="h-4" />
         </div>
       </div>
