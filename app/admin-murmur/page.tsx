@@ -4,61 +4,55 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  ShieldAlert, Trash2, MessageSquare, Clock, Unlock, 
-  ShieldCheck, Zap, Gavel, X, AlertOctagon, CheckCircle2,
-  RefreshCw, Terminal, Eye, Filter, UserMinus
+  ShieldAlert, Trash2, Unlock, RefreshCw, Terminal, 
+  Gavel, X, CheckCircle2, Wind, Activity, Radio, 
+  Database, ShieldCheck, Eraser
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function AdminDashboard() {
   const [reports, setReports] = useState<any[]>([]);
   const [bannedUsers, setBannedUsers] = useState<any[]>([]);
+  const [liveNodes, setLiveNodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"reports" | "pending" | "bans">("reports");
+  const [view, setView] = useState<"reports" | "pending" | "bans" | "nodes">("reports");
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Modal State
   const [showBanModal, setShowBanModal] = useState(false);
   const [targetFp, setTargetFp] = useState("");
+  const [targetName, setTargetName] = useState(""); 
   const [banReason, setBanReason] = useState("");
-  const [banDays, setBanDays] = useState<number | null>(null);
 
   const fetchData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     setIsRefreshing(true);
     
     try {
-      const { data: rep } = await supabase.from("reports").select("*").order("created_at", { ascending: false });
-      const { data: ban } = await supabase.from("banned_fingerprints").select("*").order("created_at", { ascending: false });
-      
-      const grouped = rep?.reduce((acc: any, curr: any) => {
+      await supabase.rpc('purge_inactive_rooms');
+
+      const [repRes, banRes, matchRes] = await Promise.all([
+        supabase.from("reports").select("*").order("created_at", { ascending: false }),
+        supabase.from("banned_fingerprints").select("*").order("created_at", { ascending: false }),
+        supabase.from("matchmaking").select("*").order("created_at", { ascending: false })
+      ]);
+
+      const grouped = repRes.data?.reduce((acc: any, curr: any) => {
         const fp = curr.fingerprint || "unknown";
         if (!acc[fp]) {
-          acc[fp] = { 
-            ...curr, 
-            count: 0, 
-            all_logs: [], 
-            reportIds: [],
-            latest_report: curr.created_at
-          };
+          acc[fp] = { ...curr, count: 0, all_logs: [], reportIds: [] };
         }
         acc[fp].count += 1;
         acc[fp].reportIds.push(curr.id);
-        
-        // Merge chat logs if they exist
-        if (curr.chat_log && Array.isArray(curr.chat_log)) {
-          // Add logs but avoid massive duplicates
-          const newLogs = curr.chat_log.filter((log: any) => 
-            !acc[fp].all_logs.some((existing: any) => existing.content === log.content && existing.nickname === log.nickname)
-          );
-          acc[fp].all_logs.push(...newLogs);
-        }
+        if (curr.chat_log) acc[fp].all_logs.push(...curr.chat_log);
         return acc;
       }, {});
 
       setReports(Object.values(grouped || {}));
-      setBannedUsers(ban || []);
+      setBannedUsers(banRes.data || []);
+      setLiveNodes(matchRes.data || []);
     } catch (err) {
-      console.error("Critical System Error:", err);
+      console.error("System Failure:", err);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -67,19 +61,24 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(() => fetchData(true), 30000); // Auto-refresh every 30s
+    const interval = setInterval(() => fetchData(true), 10000);
     return () => clearInterval(interval);
   }, [fetchData]);
 
+  const nuclearFlush = async () => {
+    setIsRefreshing(true);
+    await supabase.from("matchmaking").delete().neq("id", 0);
+    await supabase.rpc('purge_inactive_rooms');
+    fetchData();
+  };
+
   const handleExecuteBan = async () => {
     if (!targetFp) return;
-    const expires_at = banDays ? new Date(Date.now() + banDays * 24 * 60 * 60 * 1000).toISOString() : null;
-    
     const { error } = await supabase.from("banned_fingerprints").insert([
-      { fingerprint: targetFp.trim(), reason: banReason || "Violation of Protocol", expires_at }
+      { fingerprint: targetFp.trim(), reason: banReason || "Protocol Violation" }
     ]);
-
     if (!error) {
+      // This delete triggers the SQL handle_user_cleanup (wiping messages)
       await supabase.from("reports").delete().eq("fingerprint", targetFp);
       setShowBanModal(false);
       setBanReason("");
@@ -87,27 +86,26 @@ export default function AdminDashboard() {
     }
   };
 
-  const deleteTarget = async (item: any) => {
-    if (view === "bans") {
-      await supabase.from("banned_fingerprints").delete().eq("id", item.id);
-    } else {
-      await supabase.from("reports").delete().in("id", item.reportIds);
-    }
+  const pardonUser = async (id: string) => {
+    // This delete triggers the SQL handle_user_cleanup (wiping any residual messages)
+    await supabase.from("banned_fingerprints").delete().eq("id", id);
     fetchData(true);
   };
 
-  if (loading) return (
-    <div className="h-screen bg-black flex flex-col items-center justify-center">
-      <div className="relative">
-        <Zap className="w-12 h-12 text-purple-500 animate-pulse" />
-        <div className="absolute inset-0 blur-xl bg-purple-500/20 animate-pulse" />
-      </div>
-      <div className="mt-6 text-purple-500 tracking-[0.6em] font-black text-[10px] uppercase">Booting Security Terminal</div>
-    </div>
-  );
+  const clearLogsOnly = async (fingerprint: string) => {
+    const { error } = await supabase.from("messages").delete().eq("fingerprint", fingerprint);
+    if (!error) {
+      await supabase.from("reports").delete().eq("fingerprint", fingerprint);
+      fetchData(true);
+    }
+  };
 
-  const pendingUsers = reports.filter(r => r.count >= 3); // Lowered threshold to 3 for "Pending"
-  const receivedReports = reports.filter(r => r.count < 3);
+  const deleteNode = async (id: any) => {
+    await supabase.from("matchmaking").delete().eq("id", id);
+    fetchData(true);
+  };
+
+  if (loading) return <LoadingScreen />;
 
   return (
     <div className="h-[100dvh] w-full bg-[#050505] text-zinc-100 flex flex-col font-sans overflow-hidden">
@@ -115,31 +113,24 @@ export default function AdminDashboard() {
       {/* BAN MODAL */}
       <AnimatePresence>
         {showBanModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2rem] max-w-md w-full shadow-[0_0_50px_rgba(168,85,247,0.15)]">
-              <h3 className="text-xl font-black uppercase tracking-tighter mb-6 flex items-center gap-3">
-                <Gavel className="text-purple-500" /> Issue Exclusion
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
+             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="bg-zinc-950 border border-red-500/20 p-8 rounded-[2rem] max-w-md w-full shadow-2xl">
+              <h3 className="text-xl font-black uppercase italic text-red-500 mb-6 flex items-center gap-2">
+                <Gavel className="w-5 h-5" /> Terminate Node
               </h3>
-              <div className="space-y-5">
-                <div className="bg-black p-4 rounded-xl border border-zinc-800/50">
-                  <p className="text-[8px] font-black text-zinc-600 uppercase mb-1">Fingerprint</p>
-                  <code className="text-[10px] text-purple-400 break-all">{targetFp}</code>
+              <div className="space-y-4">
+                <div className="bg-black p-4 rounded-xl border border-white/5 font-mono text-[10px]">
+                  <p className="text-zinc-500 uppercase mb-1">Target Name: <span className="text-white">{targetName}</span></p>
+                  <p className="text-zinc-500 uppercase">UID: <span className="text-purple-500">{targetFp}</span></p>
                 </div>
                 <input 
                   value={banReason} onChange={(e) => setBanReason(e.target.value)}
-                  placeholder="Violation Reason..."
-                  className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-sm outline-none focus:border-purple-500 transition-all"
+                  placeholder="Violation details..."
+                  className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-xs outline-none focus:border-red-500 transition-colors"
                 />
-                <div className="grid grid-cols-3 gap-2">
-                  {[1, 7, null].map((d) => (
-                    <button key={String(d)} onClick={() => setBanDays(d)} className={`py-3 rounded-xl text-[9px] font-black uppercase border transition-all ${banDays === d ? "bg-purple-600 border-purple-500" : "bg-zinc-800 border-zinc-700 text-zinc-500"}`}>
-                      {d ? `${d}D` : "Permanent"}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex gap-3 pt-4">
-                   <button onClick={handleExecuteBan} className="flex-1 bg-white text-black py-4 rounded-xl font-black uppercase text-xs">Execute Ban</button>
-                   <button onClick={() => setShowBanModal(false)} className="px-6 bg-zinc-800 rounded-xl"><X className="w-5 h-5" /></button>
+                <div className="flex gap-3">
+                   <button onClick={handleExecuteBan} className="flex-1 bg-red-600 hover:bg-red-500 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all">Confirm Exile</button>
+                   <button onClick={() => setShowBanModal(false)} className="px-6 bg-zinc-900 rounded-xl hover:bg-zinc-800 transition-colors"><X className="w-5 h-5" /></button>
                 </div>
               </div>
             </motion.div>
@@ -147,124 +138,128 @@ export default function AdminDashboard() {
         )}
       </AnimatePresence>
 
-      {/* TOP NAVBAR */}
-      <header className="px-6 py-4 border-b border-white/5 bg-zinc-950/50 backdrop-blur-md flex flex-wrap items-center justify-between gap-4 shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <ShieldAlert className="text-red-500 w-8 h-8" />
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-ping" />
+      {/* HEADER */}
+      <header className="px-8 py-6 border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl flex items-center justify-between shrink-0 relative overflow-hidden">
+          <div className="flex items-center gap-6">
+              <div className="p-3 bg-red-500/10 rounded-2xl border border-red-500/20"><ShieldAlert className="text-red-500 w-6 h-6 animate-pulse" /></div>
+              <div>
+                <h1 className="text-2xl font-black italic tracking-tighter uppercase leading-none">Command Center</h1>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="flex items-center gap-1 text-[8px] font-black text-green-500 uppercase tracking-widest"><Activity className="w-2 h-2" /> System Live</span>
+                  <span className="text-[8px] text-zinc-600 uppercase font-black tracking-widest flex items-center gap-1"><Database className="w-2 h-2" /> Sync: 10s</span>
+                </div>
+              </div>
           </div>
-          <div>
-            <h1 className="text-xl font-black italic tracking-tighter uppercase leading-none">Command Center</h1>
-            <p className="text-[8px] text-zinc-500 font-bold uppercase tracking-[0.2em] mt-1">Status: Fully Operational</p>
-          </div>
-        </div>
-        
-        <nav className="flex bg-black/50 p-1 rounded-2xl border border-zinc-800/50">
-          {[
-            { id: 'reports', label: 'Inbox', count: receivedReports.length, icon: MessageSquare },
-            { id: 'pending', label: 'Threats', count: pendingUsers.length, icon: AlertOctagon },
-            { id: 'bans', label: 'Exiled', count: bannedUsers.length, icon: UserMinus }
-          ].map((tab) => (
-            <button key={tab.id} onClick={() => setView(tab.id as any)} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all flex items-center gap-2 uppercase ${view === tab.id ? 'bg-zinc-800 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}>
-              <tab.icon className={`w-3.5 h-3.5 ${view === tab.id ? 'text-purple-500' : ''}`} />
-              {tab.label}
-              <span className="ml-1 opacity-50 bg-black px-1.5 py-0.5 rounded text-[8px]">{tab.count}</span>
-            </button>
-          ))}
-        </nav>
 
-        <div className="flex items-center gap-3">
-          <button onClick={() => fetchData()} className={`p-2.5 rounded-xl border border-zinc-800 text-zinc-500 hover:text-white transition-all ${isRefreshing ? 'animate-spin' : ''}`}>
-            <RefreshCw className="w-4 h-4" />
-          </button>
-          <button onClick={() => { if(confirm("Purge all?")) supabase.from("reports").delete().neq("id",0).then(()=>fetchData()) }} className="px-4 py-2.5 bg-red-500/10 border border-red-500/20 rounded-xl text-[9px] font-black text-red-500 uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">
-            Purge Logs
-          </button>
-        </div>
+          <nav className="flex bg-black/40 p-1.5 rounded-2xl border border-white/5">
+            {[
+              { id: "reports", label: "Inbox", count: reports.filter(r => r.count < 3).length },
+              { id: "pending", label: "Threats", count: reports.filter(r => r.count >= 3).length },
+              { id: "nodes", label: "Nodes", count: liveNodes.length, icon: Radio },
+              { id: "bans", label: "Exiled", count: bannedUsers.length }
+            ].map((tab) => (
+              <button key={tab.id} onClick={() => setView(tab.id as any)} className={cn("px-5 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all flex items-center gap-2", view === tab.id ? "bg-white text-black" : "text-zinc-500 hover:text-white")}>
+                {tab.label} <span className={cn("px-1.5 py-0.5 rounded-md text-[8px]", view === tab.id ? "bg-black text-white" : "bg-zinc-800 text-zinc-400")}>{tab.count}</span>
+              </button>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-3">
+              <button onClick={nuclearFlush} className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-amber-500/20 text-amber-500 hover:bg-amber-500 transition-all text-[9px] font-black uppercase tracking-widest">
+                <Wind className="w-3 h-3" /> Flush System
+              </button>
+              <button onClick={() => fetchData()} className="p-3 rounded-xl bg-zinc-900 border border-white/5 text-zinc-400 hover:text-white">
+                <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
+              </button>
+          </div>
       </header>
 
-      {/* LIST CONTENT */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-        <div className="max-w-7xl mx-auto space-y-4">
+      {/* MAIN DATA STREAM */}
+      <main className="flex-1 overflow-y-auto p-8 custom-scrollbar relative">
+        <div className="max-w-7xl mx-auto">
           <AnimatePresence mode="popLayout">
-            {(view === "reports" ? receivedReports : view === "pending" ? pendingUsers : bannedUsers).map((item) => (
-              <motion.div layout key={item.fingerprint || item.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-[#0c0c0c] border border-white/5 rounded-[1.5rem] p-5 hover:border-purple-500/30 transition-all group"
-              >
-                <div className="flex flex-col lg:flex-row gap-6">
-                  {/* Subject Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${
-                        view === 'bans' ? 'border-purple-500/30 bg-purple-500/5 text-purple-400' :
-                        item.count >= 5 ? 'border-red-500/30 bg-red-500/5 text-red-500' :
-                        'border-amber-500/30 bg-amber-500/5 text-amber-500'
-                      }`}>
-                        {item.count ? `Threat Level ${item.count}` : "Blacklisted"}
+            
+            {/* VIEW: LIVE NODES */}
+            {view === "nodes" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {liveNodes.map((node) => (
+                  <motion.div layout key={node.id} className="bg-zinc-900/40 border border-white/5 p-5 rounded-3xl group">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                        <h3 className="text-xs font-black uppercase text-white tracking-widest">{node.nickname}</h3>
                       </div>
-                      <span className="text-[10px] font-mono text-zinc-600 truncate">{item.fingerprint}</span>
+                      <button onClick={() => deleteNode(node.id)} className="opacity-0 group-hover:opacity-100 p-2 text-zinc-500 hover:text-red-500 transition-all"><Trash2 className="w-4 h-4" /></button>
                     </div>
+                    <div className="space-y-2 font-mono text-[9px]">
+                      <p className="text-zinc-500 uppercase">Status: <span className="text-blue-400">{node.partner_found ? "Handshake" : "Broadcasting"}</span></p>
+                      <p className="text-zinc-500 uppercase italic">Created: {new Date(node.created_at).toLocaleTimeString()}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
 
-                    <h3 className="text-xl font-black uppercase tracking-tight text-zinc-200 mb-4 flex items-center gap-2">
-                      <Terminal className="w-4 h-4 text-purple-500" />
-                      {item.reported_user || item.nickname || "Unknown_Entity"}
-                    </h3>
-
-                    {/* Chat Log Terminal */}
-                    {item.all_logs && item.all_logs.length > 0 && (
-                      <div className="bg-black/80 rounded-xl border border-white/5 p-4 max-h-40 overflow-y-auto custom-scrollbar font-mono text-[11px] space-y-2">
-                        {item.all_logs.map((log: any, i: number) => (
-                          <div key={i} className="flex gap-2">
-                            <span className="text-purple-600 shrink-0">[{log.nickname}]:</span>
-                            <span className="text-zinc-400 leading-relaxed">{log.content}</span>
-                          </div>
-                        ))}
+            {/* VIEW: REPORTS & THREATS */}
+            {(view === "reports" || view === "pending") && (view === "reports" ? reports.filter(r => r.count < 3) : reports.filter(r => r.count >= 3)).map((item) => (
+              <motion.div layout key={item.fingerprint} className="bg-zinc-900/30 border border-white/5 rounded-[2.5rem] p-8 mb-6 border-l-4 border-l-red-500/30">
+                <div className="flex flex-col gap-6">
+                   <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-mono text-zinc-500">{item.fingerprint}</span>
+                      <div className="flex gap-3">
+                        <button onClick={() => clearLogsOnly(item.fingerprint)} className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-5 py-3 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 transition-all">
+                          <Eraser className="w-3 h-3" /> Clear Logs
+                        </button>
+                        <button onClick={() => { setTargetFp(item.fingerprint); setTargetName(item.reported_user); setShowBanModal(true); }} className="bg-white hover:bg-red-600 hover:text-white text-black px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">Exile Node</button>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex lg:flex-col justify-end gap-2 shrink-0">
-                    {view !== "bans" ? (
-                      <button onClick={() => { setTargetFp(item.fingerprint); setBanReason(item.reason); setShowBanModal(true); }}
-                        className="bg-white text-black px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 hover:bg-purple-500 hover:text-white transition-all"
-                      >
-                        <Gavel className="w-4 h-4" /> Exile
-                      </button>
-                    ) : (
-                      <button onClick={() => deleteTarget(item)}
-                        className="bg-green-500/10 text-green-500 border border-green-500/20 px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 hover:bg-green-500 hover:text-white transition-all"
-                      >
-                        <Unlock className="w-4 h-4" /> Pardon
-                      </button>
-                    )}
-                    <button onClick={() => deleteTarget(item)} className="p-3 bg-zinc-900 text-zinc-500 rounded-xl hover:text-red-500 hover:bg-red-500/10 transition-all border border-transparent hover:border-red-500/20">
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
+                   </div>
+                   <div className="bg-black/50 p-6 rounded-3xl space-y-3 border border-white/5">
+                      {item.all_logs?.map((log: any, i: number) => (
+                        <div key={i} className="text-[11px] font-mono flex gap-4 border-b border-white/5 pb-2 last:border-0">
+                          <span className="text-red-500 font-bold w-24 shrink-0 uppercase tracking-tighter">[{log.nickname}]</span>
+                          <span className="text-zinc-300">{log.content}</span>
+                        </div>
+                      ))}
+                   </div>
                 </div>
               </motion.div>
             ))}
+
+            {/* VIEW: BANS */}
+            {view === "bans" && (
+              <div className="space-y-3">
+                {bannedUsers.map((item) => (
+                  <motion.div layout key={item.id} className="bg-purple-900/5 border border-purple-500/20 rounded-3xl p-6 flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      <div className="p-3 bg-purple-500/10 rounded-2xl"><ShieldCheck className="w-5 h-5 text-purple-500" /></div>
+                      <div>
+                        <code className="text-[10px] text-zinc-400 font-mono block mb-1">{item.fingerprint}</code>
+                        <p className="text-[9px] text-purple-400 font-black uppercase tracking-widest">Reason: {item.reason}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => pardonUser(item.id)} className="px-6 py-3 bg-white/5 hover:bg-white hover:text-black text-white rounded-2xl font-black text-[9px] uppercase tracking-widest transition-all">Authorize Re-Entry</button>
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </AnimatePresence>
 
-          {(view === "reports" ? receivedReports : view === "pending" ? pendingUsers : bannedUsers).length === 0 && (
-            <div className="py-20 text-center border-2 border-dashed border-zinc-900 rounded-[2rem]">
-              <CheckCircle2 className="w-12 h-12 text-zinc-800 mx-auto mb-4" />
-              <p className="text-zinc-600 font-black uppercase tracking-widest text-[10px]">Frequency Clear. No violations found.</p>
+          {/* EMPTY STATE */}
+          {(view === "bans" ? bannedUsers : view === "nodes" ? liveNodes : reports).length === 0 && (
+            <div className="py-40 text-center opacity-10">
+              <Terminal className="w-20 h-20 mx-auto mb-6" />
+              <p className="font-black uppercase tracking-[0.5em] text-sm">Frequency Clear</p>
             </div>
           )}
         </div>
       </main>
-
-      {/* FOOTER STATUS */}
-      <footer className="px-6 py-3 bg-black border-t border-white/5 flex justify-between items-center text-[9px] font-black text-zinc-600 uppercase tracking-widest">
-        <div className="flex gap-6">
-          <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" /> DB Link Active</span>
-          <span className="flex items-center gap-2"><Clock className="w-3 h-3" /> Last Scan: {new Date().toLocaleTimeString()}</span>
-        </div>
-        <div className="text-purple-900">Alpha Protocol v2.0.4</div>
-      </footer>
     </div>
   );
+}
+
+function LoadingScreen() {
+    return <div className="h-screen bg-black flex flex-col items-center justify-center gap-4">
+      <div className="w-12 h-12 border-4 border-red-500/20 border-t-red-500 rounded-full animate-spin" />
+      <div className="text-red-500 font-black uppercase tracking-[0.8em] text-[10px] animate-pulse">Establishing Secure Uplink...</div>
+    </div>;
 }
