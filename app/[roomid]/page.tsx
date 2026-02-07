@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, useRef, memo } from "react";
+import { useEffect, useState, useRef, memo, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
-import { Hash, Send, Trash2, AlertTriangle, LogOut, Copy, Check, Flag, X } from "lucide-react";
+import { Hash, Send, Trash2, AlertTriangle, LogOut, Copy, Check, Flag, X, Terminal, Users } from "lucide-react";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
-/* AD COMPONENT: Updated with New Key for murmurz.org */
+
+/* AD COMPONENT: Persistent & Optimized */
 const AdsterraBanner = memo(() => {
   const adRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
@@ -15,42 +16,21 @@ const AdsterraBanner = memo(() => {
     if (adRef.current && !initialized.current) {
       initialized.current = true;
       const container = adRef.current;
-
       const configScript = document.createElement("script");
       configScript.type = "text/javascript";
-      configScript.innerHTML = `
-        atOptions = {
-          'key' : 'd5b7d02c3eed6fede79ae09ea0e30660',
-          'format' : 'iframe',
-          'height' : 250,
-          'width' : 300,
-          'params' : {}
-        };
-      `;
-      
+      configScript.innerHTML = `atOptions = { 'key' : 'fa3453ae0f13be3b5ba238031d224e99', 'format' : 'iframe', 'height' : 250, 'width' : 300, 'params' : {} };`;
       const adScript = document.createElement("script");
       adScript.type = "text/javascript";
-      adScript.src = "//www.highperformanceformat.com/d5b7d02c3eed6fede79ae09ea0e30660/invoke.js";
-
+      adScript.src = "//www.highperformanceformat.com/fa3453ae0f13be3b5ba238031d224e99/invoke.js";
       container.appendChild(configScript);
       container.appendChild(adScript);
     }
   }, []);
 
   return (
-    <div className="flex flex-col items-center my-8 py-6 border-y border-zinc-900/50 bg-zinc-950/40 shadow-inner">
-      <span className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.4em] mb-4">
-        Sponsored Message
-      </span>
-      
-      <div 
-        ref={adRef} 
-        className="rounded-xl overflow-hidden border border-zinc-800 bg-black min-h-[250px] min-w-[300px] flex items-center justify-center shadow-2xl"
-      />
-      
-      <p className="text-[8px] text-zinc-800 mt-3 font-bold uppercase tracking-tighter">
-        Secure Ad Link • Encrypted Connection
-      </p>
+    <div className="flex flex-col items-center my-8 py-6 border-y border-white/5 bg-zinc-950/40 shadow-inner">
+      <span className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.4em] mb-4">Transmission Sponsor</span>
+      <div ref={adRef} className="rounded-xl overflow-hidden border border-zinc-800 bg-black min-h-[250px] min-w-[300px] flex items-center justify-center shadow-2xl" />
     </div>
   );
 });
@@ -68,22 +48,14 @@ export default function ChatRoom() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [copied, setCopied] = useState(false);
   const [onlineCount, setOnlineCount] = useState(0);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
   
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState("");
-  const [customReason, setCustomReason] = useState("");
+  const [isReporting, setIsReporting] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
-
-  const handlePurgeAndExit = async () => {
-    if (!roomid || !nickname) return;
-    await supabase.from("messages").delete().eq("room_id", roomid).eq("nickname", nickname);
-    if (onlineCount <= 1) {
-      await supabase.from("rooms").delete().eq("id", roomid);
-    }
-    router.push("/lobby");
-  };
 
   useEffect(() => {
     const savedName = sessionStorage.getItem("murmur_nickname");
@@ -91,6 +63,7 @@ export default function ChatRoom() {
     setNickname(savedName);
   }, [router]);
 
+  // Setup Chat & Presence
   useEffect(() => {
     if (!roomid || !nickname) return;
 
@@ -108,6 +81,12 @@ export default function ChatRoom() {
         .on("presence", { event: "sync" }, () => {
           const state = channel.presenceState();
           setOnlineCount(Object.keys(state).length);
+          
+          // Track typing users
+          const typing = Object.entries(state)
+            .filter(([key, info]: [string, any]) => key !== nickname && info[0]?.isTyping)
+            .map(([key]) => key);
+          setTypingUsers(typing);
         })
         .on("postgres_changes" as any, { 
           event: "*", schema: "public", table: "messages", filter: `room_id=eq.${roomid}` 
@@ -117,7 +96,7 @@ export default function ChatRoom() {
         })
         .subscribe(async (status: string) => {
           if (status === "SUBSCRIBED") {
-            await channel.track({ online_at: new Date().toISOString(), fp: result.visitorId });
+            await channel.track({ online_at: new Date().toISOString(), fp: result.visitorId, isTyping: false });
           }
         });
     };
@@ -126,31 +105,44 @@ export default function ChatRoom() {
     return () => { if (channelRef.current) supabase.removeChannel(channelRef.current); };
   }, [roomid, nickname]);
 
+  // Enhanced Reporting Logic
   const submitReport = async () => {
-    const finalReason = reportReason === "Other" ? customReason : reportReason;
-    if (!finalReason) return alert("Select a reason.");
+    if (!reportReason || isReporting) return;
+    setIsReporting(true);
 
-    const presence = channelRef.current?.presenceState();
-    const logsWithFp = messages.slice(-30).map(msg => ({
-      nickname: msg.nickname,
-      content: msg.content,
-      fp: presence[msg.nickname]?.[0]?.fp || "Unknown"
-    }));
+    try {
+      const presence = channelRef.current?.presenceState() || {};
+      
+      // Find the last person who messaged (that isn't me)
+      const lastOtherMessage = [...messages].reverse().find(m => m.nickname !== nickname);
+      const targetNickname = lastOtherMessage?.nickname || "Unknown";
+      
+      // Get their fingerprint from Presence state
+      const targetFp = presence[targetNickname]?.[0]?.fp || "Fingerprint_Not_Captured";
 
-    const lastOtherMessage = [...messages].reverse().find(m => m.nickname !== nickname);
-    const targetFp = lastOtherMessage ? (presence[lastOtherMessage.nickname]?.[0]?.fp || "Unknown") : "Unknown";
+      const logs = messages.slice(-20).map(msg => ({
+        nickname: msg.nickname,
+        content: msg.content
+      }));
 
-    await supabase.from("reports").insert([{
-      reported_by: nickname,
-      reported_user: lastOtherMessage?.nickname || "Unknown",
-      fingerprint: targetFp,
-      room_id: roomid,
-      chat_log: logsWithFp,
-      reason: finalReason
-    }]);
+      const { error } = await supabase.from("reports").insert([{
+        reported_user: targetNickname,
+        fingerprint: targetFp,
+        reason: reportReason,
+        chat_log: logs,
+        room_id: roomid
+      }]);
 
-    alert("Reported. Admin will review the encrypted logs.");
-    setShowReportModal(false);
+      if (!error) {
+        setShowReportModal(false);
+        setReportReason("");
+        alert("Subject reported to command center.");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsReporting(false);
+    }
   };
 
   const sendMessage = async (e: React.FormEvent) => {
@@ -158,134 +150,166 @@ export default function ChatRoom() {
     if (!roomid || !newMessage.trim()) return;
     const content = newMessage;
     setNewMessage(""); 
+    if (channelRef.current) channelRef.current.track({ isTyping: false, fp: myFingerprint });
     await supabase.from("messages").insert([{ room_id: roomid, nickname, content }]);
   };
 
-  const copyInvite = () => {
-    if (!roomid) return;
-    const inviteUrl = `${window.location.origin}/lobby?id=${roomid}`;
-    navigator.clipboard.writeText(inviteUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleInputChange = (val: string) => {
+    setNewMessage(val);
+    if (channelRef.current) {
+      channelRef.current.track({ isTyping: val.length > 0, fp: myFingerprint });
+    }
   };
+
+const copyInvite = () => {
+  // Point this to your main entry page where the "Join" button usually lives
+  const inviteUrl = `${window.location.origin}/?id=${roomid}`; 
+  navigator.clipboard.writeText(inviteUrl);
+  setCopied(true);
+  setTimeout(() => setCopied(false), 2000);
+};
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, typingUsers]);
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-zinc-950 text-zinc-100 overflow-hidden font-sans">
+    <div className="flex flex-col h-[100dvh] bg-[#050505] text-zinc-100 overflow-hidden font-sans">
       
       {/* REPORT MODAL */}
       <AnimatePresence>
         {showReportModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl w-full max-w-sm shadow-2xl">
-              <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-red-500"><Flag className="w-5 h-5"/> Report Incident</h3>
-              <div className="space-y-3 mb-6">
-                {["Harassment", "Spamming", "NSFW Content", "Other"].map((r) => (
-                  <button key={r} onClick={() => setReportReason(r)} className={`w-full p-3 rounded-xl border text-xs font-bold transition-all uppercase tracking-widest ${reportReason === r ? "bg-red-600 border-red-500 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-400"}`}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="bg-zinc-900 border border-white/5 p-8 rounded-[2rem] w-full max-w-sm shadow-2xl">
+              <h3 className="text-xl font-black mb-6 flex items-center gap-3 text-red-500 uppercase tracking-tighter">
+                <Flag className="w-5 h-5 text-red-500" /> Report Sector
+              </h3>
+              <div className="grid gap-2 mb-8">
+                {["Harassment", "Spam", "NSFW Content", "Toxic Behavior"].map((r) => (
+                  <button key={r} onClick={() => setReportReason(r)} className={`w-full p-4 rounded-2xl border text-[10px] font-black transition-all uppercase tracking-[0.2em] ${reportReason === r ? "bg-red-600 border-red-500 text-white" : "bg-black border-zinc-800 text-zinc-500"}`}>
                     {r}
                   </button>
                 ))}
-                {reportReason === "Other" && (
-                  <textarea value={customReason} onChange={(e) => setCustomReason(e.target.value)} placeholder="Details..." className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-sm text-white" />
-                )}
               </div>
               <div className="flex gap-3">
-                <button onClick={submitReport} className="flex-1 bg-white text-black py-3 rounded-xl font-black text-xs uppercase tracking-widest">SUBMIT</button>
-                <button onClick={() => setShowReportModal(false)} className="px-5 bg-zinc-800 py-3 rounded-xl font-bold text-zinc-400 border border-zinc-700 hover:bg-zinc-700 transition-all"><X className="w-4 h-4" /></button>
+                <button onClick={submitReport} disabled={!reportReason || isReporting} className="flex-1 bg-white text-black py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95 disabled:opacity-50">
+                  {isReporting ? "Relaying..." : "Confirm Report"}
+                </button>
+                <button onClick={() => setShowReportModal(false)} className="px-6 bg-zinc-800 rounded-2xl border border-zinc-700 hover:bg-zinc-700 transition-all"><X className="w-4 h-4 text-zinc-400" /></button>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
+      {/* CONFIRM EXIT MODAL */}
       <AnimatePresence>
         {showConfirm && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl max-w-xs w-full text-center shadow-2xl">
-              <div className="w-14 h-14 bg-red-500/10 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-red-500/20"><AlertTriangle className="w-7 h-7" /></div>
-              <h3 className="text-xl font-bold mb-2 uppercase italic tracking-tighter">End Session?</h3>
-              <p className="text-zinc-400 text-xs mb-6 px-4 font-bold uppercase tracking-widest leading-relaxed">Your logs will be purged from this frequency.</p>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="bg-zinc-900 border border-white/5 p-8 rounded-[2rem] max-w-xs w-full text-center">
+              <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-red-500/20"><AlertTriangle className="w-8 h-8" /></div>
+              <h3 className="text-xl font-black mb-2 uppercase italic tracking-tighter">Sever Connection?</h3>
+              <p className="text-zinc-500 text-[10px] mb-8 font-bold uppercase tracking-widest leading-relaxed">Your logs will be purged from the active frequency.</p>
               <div className="flex flex-col gap-3">
-                <button onClick={handlePurgeAndExit} className="w-full bg-red-600 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-500 transition-all">Confirm <LogOut className="w-4 h-4" /></button>
-                <button onClick={() => setShowConfirm(false)} className="w-full bg-zinc-800 py-4 rounded-2xl text-zinc-400 font-bold text-xs uppercase tracking-widest border border-zinc-700">Stay</button>
+                <button onClick={() => router.push("/lobby")} className="w-full bg-red-600 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-white">Sever Link</button>
+                <button onClick={() => setShowConfirm(false)} className="w-full bg-zinc-800 py-4 rounded-2xl text-zinc-400 font-bold text-xs uppercase tracking-widest border border-zinc-700">Stay Online</button>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <header className="h-20 border-b border-zinc-800/50 bg-zinc-900/40 backdrop-blur-xl flex items-center justify-between px-4 md:px-8 shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 bg-purple-600/20 rounded-xl flex items-center justify-center border border-purple-500/30 shrink-0">
+      {/* HEADER */}
+      <header className="h-20 border-b border-white/5 bg-zinc-950/50 backdrop-blur-xl flex items-center justify-between px-4 md:px-8 shrink-0 z-50">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="w-10 h-10 bg-purple-600/10 rounded-xl flex items-center justify-center border border-purple-500/20 shrink-0 shadow-[0_0_15px_rgba(168,85,247,0.1)]">
             <Hash className="w-5 h-5 text-purple-400" />
           </div>
           <div className="min-w-0">
-            <h2 className="font-bold text-sm md:text-lg truncate tracking-tighter uppercase italic">{roomid}</h2>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
-              <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{onlineCount} Active</span>
+            <h2 className="font-black text-sm md:text-lg truncate tracking-tighter uppercase italic">{roomid}</h2>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="flex items-center gap-1.5 text-[9px] text-green-500 font-black uppercase tracking-widest">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" /> 
+                {onlineCount} Nodes Active
+              </span>
             </div>
           </div>
         </div>
         
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowReportModal(true)} className="h-10 w-10 flex items-center justify-center rounded-xl border border-zinc-800 text-zinc-600 hover:text-red-500 transition-all">
+          <button onClick={() => setShowReportModal(true)} className="h-11 w-11 flex items-center justify-center rounded-xl border border-white/5 text-zinc-600 hover:text-red-500 hover:bg-red-500/5 transition-all">
             <Flag className="w-4 h-4" />
           </button>
-          <button onClick={copyInvite} className="h-10 px-3 md:px-5 rounded-xl border border-zinc-800 bg-zinc-900/50 flex items-center gap-2 text-[10px] md:text-sm font-bold uppercase tracking-widest hover:bg-zinc-800 transition-all text-zinc-300">
+          <button onClick={copyInvite} className="h-11 px-4 md:px-6 rounded-xl border border-white/5 bg-black/40 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] hover:border-purple-500/30 transition-all text-zinc-400">
             {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />} 
             <span className="hidden sm:inline">{copied ? "Copied" : "Invite"}</span>
           </button>
-          <button onClick={() => setShowConfirm(true)} className="h-10 w-10 flex items-center justify-center rounded-xl border border-zinc-800 text-zinc-500 hover:text-red-400 active:scale-95 transition-all"><Trash2 className="w-4 h-4" /></button>
+          <button onClick={() => setShowConfirm(true)} className="h-11 w-11 flex items-center justify-center rounded-xl border border-white/5 text-zinc-500 hover:bg-zinc-900 transition-all"><LogOut className="w-4 h-4" /></button>
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 no-scrollbar overscroll-none">
-        {messages.map((msg, i) => (
-          <div key={msg.id || i}>
-            {msg.isSystem ? (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center my-4">
-                <span className="text-[9px] bg-zinc-900/50 border border-zinc-800/30 px-4 py-1.5 rounded-full text-zinc-500 font-bold uppercase tracking-widest">
-                  {msg.content}
+      {/* CHAT AREA */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 no-scrollbar">
+        <div className="max-w-5xl mx-auto space-y-8">
+          {messages.map((msg, i) => {
+            const isMe = msg.nickname === nickname;
+            return (
+              <div key={msg.id || i}>
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                  className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                  <span className="text-[9px] font-black text-zinc-600 mb-2 px-1 tracking-[0.2em] uppercase flex items-center gap-2">
+                    {!isMe && <Terminal className="w-3 h-3 text-purple-500/50" />} {msg.nickname}
+                  </span>
+                  <div className={`px-5 py-3.5 rounded-2xl text-[15px] leading-relaxed max-w-[85%] md:max-w-[70%] shadow-2xl transition-all ${
+                    isMe 
+                    ? "bg-purple-600 text-white rounded-tr-none shadow-purple-900/20" 
+                    : "bg-zinc-900/60 border border-white/5 backdrop-blur-md rounded-tl-none text-zinc-200"
+                  }`}>
+                    {msg.content}
+                  </div>
+                </motion.div>
+
+                {(i + 1) % 10 === 0 && <AdsterraBanner />}
+              </div>
+            );
+          })}
+          
+          {/* TYING INDICATOR */}
+          <AnimatePresence>
+            {typingUsers.length > 0 && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2 text-purple-500/50 px-2">
+                <div className="flex gap-1">
+                  <span className="w-1 h-1 bg-current rounded-full animate-bounce [animation-delay:-0.3s]" />
+                  <span className="w-1 h-1 bg-current rounded-full animate-bounce [animation-delay:-0.15s]" />
+                  <span className="w-1 h-1 bg-current rounded-full animate-bounce" />
+                </div>
+                <span className="text-[9px] font-black uppercase tracking-widest">
+                  {typingUsers.length === 1 ? `${typingUsers[0]} is typing` : 'Multiple nodes typing'}
                 </span>
               </motion.div>
-            ) : (
-              <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                className={`max-w-[85%] md:max-w-[75%] flex flex-col ${msg.nickname === nickname ? "ml-auto items-end" : "items-start"}`}>
-                <span className="text-[10px] font-bold text-zinc-600 mb-1 px-1 tracking-widest uppercase">{msg.nickname}</span>
-                <div className={`px-4 py-3 rounded-2xl text-[15px] md:text-[16px] leading-relaxed shadow-lg ${
-                  msg.nickname === nickname 
-                  ? "bg-purple-600 text-white rounded-tr-none shadow-purple-900/10" 
-                  : "bg-zinc-900 border border-zinc-800 rounded-tl-none text-zinc-100"
-                }`}>
-                  {msg.content}
-                </div>
-              </motion.div>
             )}
-
-            {/* AD INJECTION EVERY 10 MESSAGES */}
-            {(i + 1) % 10 === 0 && <AdsterraBanner />}
-          </div>
-        ))}
-        <div ref={scrollRef} className="h-4" />
+          </AnimatePresence>
+          <div ref={scrollRef} className="h-4" />
+        </div>
       </div>
 
-      <div className="p-4 md:p-8 bg-zinc-950/50 backdrop-blur-md border-t border-zinc-900/80 safe-bottom shrink-0">
-        <form onSubmit={sendMessage} className="max-w-5xl mx-auto relative flex items-center gap-2">
+      {/* INPUT BAR */}
+      <div className="p-4 md:p-8 bg-gradient-to-t from-black via-black/80 to-transparent shrink-0">
+        <form onSubmit={sendMessage} className="max-w-4xl mx-auto relative group">
           <input 
             type="text" 
             value={newMessage} 
-            onChange={(e) => setNewMessage(e.target.value)} 
-            placeholder="Whisper into the void..." 
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl pl-4 pr-14 py-4 outline-none text-[16px] text-white focus:border-purple-500/50 transition-all shadow-inner" 
+            onChange={(e) => handleInputChange(e.target.value)} 
+            placeholder="Relay message to sector..." 
+            className="w-full bg-black/60 border border-white/10 rounded-2xl pl-6 pr-16 py-5 outline-none text-[15px] text-white focus:border-purple-500/40 focus:ring-4 focus:ring-purple-500/5 transition-all shadow-2xl placeholder:text-zinc-700" 
           />
-          <button type="submit" disabled={!newMessage.trim()} className="absolute right-2 p-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl active:scale-90 transition-all disabled:opacity-0 shadow-lg">
+          <button type="submit" disabled={!newMessage.trim()} className="absolute right-3 top-1/2 -translate-y-1/2 p-3.5 bg-white text-black rounded-xl active:scale-90 transition-all disabled:opacity-0 shadow-xl group-focus-within:bg-purple-500 group-focus-within:text-white">
             <Send className="w-5 h-5" />
           </button>
         </form>
+        <div className="text-center mt-4">
+          <span className="text-[8px] text-zinc-800 font-black uppercase tracking-[0.5em]">Protocol Murmur • End-to-End Frequency</span>
+        </div>
       </div>
     </div>
   );
