@@ -27,10 +27,20 @@ const AdsterraBanner = memo(() => {
   }, []);
 
   return (
-    <div className="flex flex-col items-center my-8 py-6 border-y border-zinc-900/50 bg-zinc-950/40 shadow-inner">
-      <span className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.4em] mb-4">Sponsored Message</span>
-      <div ref={adRef} className="rounded-xl overflow-hidden border border-zinc-800 bg-black min-h-[250px] min-w-[300px] flex items-center justify-center shadow-2xl" />
-    </div>
+    <motion.div 
+      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      className="flex flex-col items-center my-10 py-8 border-y border-white/5 bg-zinc-950/40 relative w-full"
+    >
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#050505] px-4 py-1 border border-white/10 rounded-full flex items-center gap-2 z-10">
+        <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse" />
+        <span className="text-[8px] font-black text-zinc-500 uppercase tracking-[0.3em]">System Decryption: Sponsor</span>
+      </div>
+      
+      <div ref={adRef} className="rounded-2xl overflow-hidden border border-zinc-800 bg-black min-h-[250px] min-w-[300px] flex items-center justify-center shadow-[0_0_30px_rgba(0,0,0,0.5)] transition-all hover:border-purple-500/30" />
+      
+      <span className="mt-4 text-[7px] font-bold text-zinc-800 uppercase tracking-widest">Authorized Transmission Layer</span>
+    </motion.div>
   );
 });
 AdsterraBanner.displayName = "AdsterraBanner";
@@ -131,7 +141,6 @@ function ChatContent() {
   const sendMessage = async () => {
     if (!newMessage.trim() || !roomid || !partnerNickname) return;
     
-    // Using reply_metadata to match your SQL fix
     const messageData = {
       room_id: roomid,
       nickname: nickname,
@@ -181,7 +190,7 @@ function ChatContent() {
   return (
     <div className="flex flex-col h-[100dvh] bg-[#050505] text-zinc-100 overflow-hidden font-sans">
       
-      {/* IMPROVED EXIT MODAL */}
+      {/* MODALS REMAIN FIXED */}
       <AnimatePresence>
         {showExitConfirm && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md">
@@ -198,15 +207,12 @@ function ChatContent() {
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
 
-      {/* REPORT MODAL */}
-      <AnimatePresence>
         {showReportModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] w-full max-w-sm shadow-2xl">
               <h3 className="text-xl font-black mb-4 flex items-center gap-2 text-red-500 uppercase tracking-tighter"><Flag className="w-5 h-5"/> Report Peer</h3>
-              <div className="grid gap-2 mb-6 text-black">
+              <div className="grid gap-2 mb-6">
                 {["Harassment", "Spam", "Inappropriate", "Nudity"].map((r) => (
                   <button key={r} onClick={() => setReportReason(r)} className={`w-full p-3 rounded-xl border text-[10px] font-black transition-all uppercase tracking-widest ${reportReason === r ? "bg-red-600 border-red-500 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-400"}`}>{r}</button>
                 ))}
@@ -218,10 +224,7 @@ function ChatContent() {
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
 
-      {/* PARTNER EXIT MODAL */}
-      <AnimatePresence>
         {hasPartnerLeft && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-black/90 backdrop-blur-2xl">
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2.5rem] w-full max-w-sm text-center shadow-[0_0_50px_rgba(0,0,0,0.4)]">
@@ -237,14 +240,14 @@ function ChatContent() {
         )}
       </AnimatePresence>
 
-      {/* FIXED HEADER */}
+      {/* FIXED HEADER: Locked at top */}
       <header className="h-20 shrink-0 border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl flex items-center justify-between px-4 md:px-8 z-50">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-purple-600/10 rounded-xl flex items-center justify-center border border-purple-500/20">
             <Zap className="w-5 h-5 text-purple-500" />
           </div>
           <div>
-            <h2 className="font-black text-sm uppercase italic tracking-tight">{partnerNickname || "Connecting..."}</h2>
+            <h2 className="font-black text-sm uppercase italic tracking-tight truncate max-w-[100px] md:max-w-none">{partnerNickname || "Connecting..."}</h2>
             <span className="text-[9px] text-green-500 font-black uppercase tracking-widest flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" /> Live Node
             </span>
@@ -264,19 +267,23 @@ function ChatContent() {
         </div>
       </header>
 
-      {/* SCROLLABLE MESSAGES AREA */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 no-scrollbar scroll-smooth">
+      {/* SCROLLABLE AREA */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 no-scrollbar scroll-smooth">
         <div className="max-w-4xl mx-auto space-y-10">
+          
+          {/* Starting Ad */}
+          <AdsterraBanner />
+
           <AnimatePresence mode="popLayout">
             {messages.map((msg, i) => {
               const isMe = msg.nickname === nickname;
               return (
-                <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex flex-col ${isMe ? "items-end" : "items-start"} mb-10 last:mb-4`}>
                   <span className="text-[9px] font-black text-zinc-600 mb-2 px-1 uppercase flex items-center gap-2">
                     {!isMe && <Terminal className="w-3 h-3 text-purple-500" />} {msg.nickname}
                   </span>
                   
-                  <div className={`group relative max-w-[85%] md:max-w-[70%]`}>
+                  <div className="group relative max-w-[85%] md:max-w-[70%]">
                     <button 
                       onClick={() => setReplyingTo(msg)}
                       className={`absolute top-1/2 -translate-y-1/2 p-2 rounded-lg bg-zinc-900 border border-white/10 text-zinc-500 opacity-0 group-hover:opacity-100 transition-all z-10 ${isMe ? "right-full mr-3" : "left-full ml-3"}`}
@@ -298,6 +305,7 @@ function ChatContent() {
                       {msg.content}
                     </div>
                   </div>
+                  {/* Recurring Ads every 10 messages */}
                   {(i + 1) % 10 === 0 && <AdsterraBanner />}
                 </motion.div>
               );
@@ -307,8 +315,8 @@ function ChatContent() {
         </div>
       </div>
 
-      {/* FIXED INPUT AREA */}
-      <div className="p-4 md:p-8 bg-zinc-950/80 backdrop-blur-xl border-t border-white/5 shrink-0">
+      {/* FIXED INPUT AREA: Locked at bottom */}
+      <div className="p-4 md:p-8 bg-zinc-950/80 backdrop-blur-xl border-t border-white/5 shrink-0 z-50">
         <div className="max-w-4xl mx-auto">
           <AnimatePresence>
             {replyingTo && (
