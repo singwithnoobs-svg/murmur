@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, memo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
-import { Hash, Send, LogOut, Copy, Check, Flag, X, Terminal } from "lucide-react";
+import { Hash, Send, LogOut, Copy, Check, Flag, X, Terminal, ChevronDown, SmilePlus, Reply, ShieldAlert } from "lucide-react";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 /* AD COMPONENT */
@@ -41,6 +41,7 @@ export default function ChatRoom() {
   const roomid = typeof params?.roomid === 'string' ? params.roomid : "";
   const router = useRouter();
 
+  // Core State
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [nickname, setNickname] = useState("");
@@ -49,14 +50,37 @@ export default function ChatRoom() {
   const [copied, setCopied] = useState(false);
   const [onlineCount, setOnlineCount] = useState(0);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [activeReactionPicker, setActiveReactionPicker] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<any>(null); // NEW: Reply state
   
+  // Reporting State
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [extraReason, setExtraReason] = useState(""); 
   const [isReporting, setIsReporting] = useState(false);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
+  // Refs
+  const scrollRef = useRef<HTMLDivElement>(null); 
+  const chatAreaRef = useRef<HTMLDivElement>(null); 
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const channelRef = useRef<any>(null);
+
+  const isImageUrl = (url: string) => url.match(/\.(jpeg|jpg|gif|png|webp)$/) != null;
+
+  const copyInvite = () => {
+    const inviteUrl = `${window.location.origin}/?id=${roomid}`;
+    navigator.clipboard.writeText(inviteUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+    }
+  }, [newMessage]);
 
   useEffect(() => {
     const savedName = sessionStorage.getItem("murmur_nickname");
@@ -68,15 +92,12 @@ export default function ChatRoom() {
     if (!roomid || !nickname) return;
 
     const setupChat = async () => {
-      // 1. Capture Fingerprint
       const fpLoad = await FingerprintJS.load();
       const result = await fpLoad.get();
       setMyFingerprint(result.visitorId);
 
-      // 2. REGISTER ROOM (The Fix: Ensures room exists before messaging)
       await supabase.from("rooms").upsert({ id: roomid }, { onConflict: 'id' });
 
-      // 3. Initialize Realtime Channel
       const channel = supabase.channel(`room-${roomid}`, {
         config: { presence: { key: nickname } }
       });
@@ -86,15 +107,17 @@ export default function ChatRoom() {
         .on("presence", { event: "sync" }, () => {
           const state = channel.presenceState();
           setOnlineCount(Object.keys(state).length);
-          const typing = Object.entries(state)
-            .filter(([key, info]: [string, any]) => key !== nickname && info[0]?.isTyping)
-            .map(([key]) => key);
+          const typing = Object.keys(state).filter((key) => {
+            const userPresence = state[key] as any;
+            return key !== nickname && userPresence[0]?.isTyping;
+          });
           setTypingUsers(typing);
         })
         .on("postgres_changes" as any, { 
           event: "*", schema: "public", table: "messages", filter: `room_id=eq.${roomid}` 
         }, (event: any) => {
           if (event.eventType === "INSERT") setMessages((prev) => [...prev, event.new]);
+          if (event.eventType === "UPDATE") setMessages((prev) => prev.map(m => m.id === event.new.id ? event.new : m));
           if (event.eventType === "DELETE") setMessages((prev) => prev.filter(m => m.id !== event.old.id));
         })
         .subscribe(async (status: string) => {
@@ -108,38 +131,23 @@ export default function ChatRoom() {
     return () => { if (channelRef.current) supabase.removeChannel(channelRef.current); };
   }, [roomid, nickname]);
 
- const handleExit = async () => {
-  try {
-    // 1. PURGE MESSAGES: Wipe all messages sent by this nickname in this room
-    const { error: msgError } = await supabase
-      .from("messages")
-      .delete()
-      .eq("room_id", roomid)
-      .eq("nickname", nickname);
-
-    if (msgError) throw msgError;
-
-    // 2. CLEANUP ROOM: Check if anyone else is left. 
-    // If onlineCount is 1 (just you), delete the whole room entry.
-    if (onlineCount <= 1) {
-      await supabase
-        .from("rooms")
-        .delete()
-        .eq("id", roomid);
+  const handleScroll = () => {
+    if (chatAreaRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = chatAreaRef.current;
+      setShowScrollButton(scrollHeight - scrollTop - clientHeight > 300);
     }
+  };
 
-    // 3. LOGOUT: Clear session and redirect
-    sessionStorage.removeItem("murmur_nickname");
-    if (channelRef.current) {
-      await supabase.removeChannel(channelRef.current);
-    }
-    router.push("/");
-  } catch (err) {
-    console.error("Purge on exit failed:", err);
-    // Redirect anyway so user isn't stuck
-    router.push("/");
-  }
-};
+  const scrollToBottom = () => scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+
+  const handleExit = async () => {
+    try {
+      await supabase.from("messages").delete().eq("room_id", roomid).eq("nickname", nickname);
+      if (onlineCount <= 1) await supabase.from("rooms").delete().eq("id", roomid);
+      sessionStorage.removeItem("murmur_nickname");
+      router.push("/");
+    } catch (err) { router.push("/"); }
+  };
 
   const submitReport = async () => {
     if (!reportReason || isReporting) return;
@@ -148,147 +156,210 @@ export default function ChatRoom() {
       const presence = channelRef.current?.presenceState() || {};
       const lastOtherMessage = [...messages].reverse().find(m => m.nickname !== nickname);
       const targetNickname = lastOtherMessage?.nickname || "Unknown";
-      const targetFp = presence[targetNickname]?.[0]?.fp || "Fingerprint_Not_Captured";
-
-      const logs = messages.slice(-30).map(msg => ({
-        nickname: msg.nickname, content: msg.content, fp: presence[msg.nickname]?.[0]?.fp || null 
-      }));
-
-      const finalReason = extraReason.trim() ? `${reportReason}: ${extraReason}` : reportReason;
+      const targetFp = presence[targetNickname]?.[0]?.fp || "Hidden_Node";
+      const logs = messages.slice(-20).map(msg => ({ nickname: msg.nickname, content: msg.content }));
 
       await supabase.from("reports").insert([{
-        reported_user: targetNickname, fingerprint: targetFp, reason: finalReason, chat_log: logs, room_id: roomid
+        reported_user: targetNickname, fingerprint: targetFp, reason: `${reportReason}: ${extraReason}`, chat_log: logs, room_id: roomid
       }]);
 
       setShowReportModal(false);
       setReportReason("");
       setExtraReason("");
       alert("Sector violation logged.");
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsReporting(false);
-    }
+    } catch (err) { console.error(err); } finally { setIsReporting(false); }
   };
 
-  const sendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const addReaction = async (messageId: string, currentReactions: any, emoji: string) => {
+    const updated = { ...(currentReactions || {}) };
+    updated[emoji] = (updated[emoji] || 0) + 1;
+    await supabase.from("messages").update({ reactions: updated }).eq("id", messageId);
+    setActiveReactionPicker(null);
+  };
+
+  const sendMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!roomid || !newMessage.trim()) return;
     const content = newMessage;
+    const replyData = replyTo ? { nickname: replyTo.nickname, content: replyTo.content } : null; // Quote data
+    
     setNewMessage(""); 
+    setReplyTo(null); // Reset reply
+    
     if (channelRef.current) channelRef.current.track({ isTyping: false, fp: myFingerprint });
-    await supabase.from("messages").insert([{ room_id: roomid, nickname, content }]);
+    await supabase.from("messages").insert([{ 
+      room_id: roomid, 
+      nickname, 
+      content, 
+      reactions: {}, 
+      reply_metadata: replyData // NEW: Store quote
+    }]);
   };
 
-  const handleInputChange = (val: string) => {
-    setNewMessage(val);
-    if (channelRef.current) {
-      channelRef.current.track({ isTyping: val.length > 0, fp: myFingerprint });
-    }
-  };
-
-  const copyInvite = () => {
-    const inviteUrl = `${window.location.origin}/?id=${roomid}`; 
-    navigator.clipboard.writeText(inviteUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, typingUsers]);
+  useEffect(() => { scrollToBottom(); }, [messages, typingUsers]);
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-[#050505] text-zinc-100 overflow-hidden font-sans">
+    <div className="fixed inset-0 flex flex-col bg-[#050505] text-zinc-100 font-sans overflow-hidden">
       
-      {/* MODALS */}
+      {/* FIXED EXIT UI */}
       <AnimatePresence>
         {showConfirm && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="bg-zinc-900 border border-white/5 p-8 rounded-[2.5rem] w-full max-w-sm shadow-2xl text-center">
-              <LogOut className="w-12 h-12 text-zinc-500 mx-auto mb-4" />
-              <h3 className="text-xl font-black mb-2 uppercase tracking-tighter italic">Sever Connection?</h3>
-              <div className="flex gap-3 mt-6">
-                <button onClick={handleExit} className="flex-1 bg-red-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95">Confirm Exit</button>
-                <button onClick={() => setShowConfirm(false)} className="px-6 bg-zinc-800 rounded-2xl border border-zinc-700 text-zinc-400 text-[10px] uppercase font-black">Stay</button>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-zinc-950 border border-white/10 p-8 rounded-[2.5rem] w-full max-w-sm shadow-[0_0_50px_rgba(0,0,0,0.5)] text-center">
+              <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-red-500/20">
+                <LogOut className="w-8 h-8 text-red-500" />
+              </div>
+              <h3 className="text-xl font-black mb-2 uppercase italic tracking-tighter">Terminate Session?</h3>
+              <p className="text-zinc-500 text-[11px] font-bold uppercase tracking-widest mb-8">Connection will be purged from node</p>
+              <div className="flex gap-3">
+                <button onClick={handleExit} className="flex-1 bg-red-600 hover:bg-red-500 py-4 rounded-xl font-black text-[10px] uppercase transition-all">Exit Room</button>
+                <button onClick={() => setShowConfirm(false)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 py-4 rounded-xl font-black text-[10px] uppercase transition-all">Stay</button>
               </div>
             </motion.div>
           </motion.div>
         )}
 
         {showReportModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="bg-zinc-900 border border-white/5 p-8 rounded-[2.5rem] w-full max-w-sm shadow-2xl">
-              <h3 className="text-xl font-black mb-6 text-red-500 uppercase tracking-tighter italic flex items-center gap-3"><Flag className="w-5 h-5" /> Report</h3>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+            <div className="bg-zinc-900 border border-white/5 p-8 rounded-[2.5rem] w-full max-w-sm">
+              <h3 className="text-xl font-black mb-6 text-red-500 uppercase italic flex items-center gap-3"><Flag className="w-5 h-5" /> Report</h3>
               <div className="grid grid-cols-2 gap-2 mb-4">
                 {["Harassment", "Spam", "NSFW", "Toxic"].map((r) => (
-                  <button key={r} onClick={() => setReportReason(r)} className={`p-3 rounded-xl border text-[9px] font-black transition-all uppercase tracking-widest ${reportReason === r ? "bg-red-600 border-red-500 text-white" : "bg-black border-zinc-800 text-zinc-600"}`}>{r}</button>
+                  <button key={r} onClick={() => setReportReason(r)} className={`p-3 rounded-xl border text-[9px] font-black uppercase ${reportReason === r ? "bg-red-600 border-red-500 text-white" : "bg-black border-zinc-800 text-zinc-600"}`}>{r}</button>
                 ))}
               </div>
-              <textarea value={extraReason} onChange={(e) => setExtraReason(e.target.value)} placeholder="Evidence..." className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-xs outline-none focus:border-red-500/50 min-h-[80px] mb-6" />
+              <textarea value={extraReason} onChange={(e) => setExtraReason(e.target.value)} placeholder="Note..." className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-xs mb-6 text-white outline-none" />
               <div className="flex gap-3">
-                <button onClick={submitReport} disabled={!reportReason || isReporting} className="flex-1 bg-white text-black py-4 rounded-2xl font-black text-[10px] uppercase active:scale-95 disabled:opacity-50">{isReporting ? "Syncing..." : "Transmit"}</button>
-                <button onClick={() => setShowReportModal(false)} className="px-6 bg-zinc-800 rounded-2xl border border-zinc-700 text-zinc-400"><X className="w-4 h-4" /></button>
+                <button onClick={submitReport} disabled={!reportReason || isReporting} className="flex-1 bg-white text-black py-4 rounded-2xl font-black text-[10px] uppercase">{isReporting ? "..." : "Submit"}</button>
+                <button onClick={() => setShowReportModal(false)} className="px-6 bg-zinc-800 rounded-2xl"><X className="w-4 h-4 text-zinc-400" /></button>
               </div>
-            </motion.div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* HEADER */}
-      <header className="h-20 border-b border-white/5 bg-zinc-950/50 backdrop-blur-xl flex items-center justify-between px-4 md:px-8 shrink-0 z-50">
+      <header className="h-20 border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl flex items-center justify-between px-4 md:px-8 shrink-0 z-50">
         <div className="flex items-center gap-4 min-w-0">
-          <div className="w-10 h-10 bg-purple-600/10 rounded-xl flex items-center justify-center border border-purple-500/20 shadow-[0_0_15px_rgba(168,85,247,0.1)]">
-            <Hash className="w-5 h-5 text-purple-400" />
-          </div>
+          <div className="w-10 h-10 bg-purple-600/10 rounded-xl flex items-center justify-center border border-purple-500/20"><Hash className="w-5 h-5 text-purple-400" /></div>
           <div>
-            <h2 className="font-black text-sm md:text-lg truncate uppercase italic tracking-tighter">{roomid}</h2>
-            <span className="flex items-center gap-1.5 text-[9px] text-green-500 font-black uppercase tracking-widest">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" /> {onlineCount} Nodes Active
-            </span>
+            <h2 className="font-black text-sm uppercase italic truncate">{roomid}</h2>
+            <span className="flex items-center gap-1.5 text-[9px] text-green-500 font-black uppercase tracking-widest"><span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" /> {onlineCount} Active</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowReportModal(true)} className="h-11 w-11 flex items-center justify-center rounded-xl border border-white/5 text-zinc-600 hover:text-red-500"><Flag className="w-4 h-4" /></button>
-          <button onClick={copyInvite} className="h-11 px-4 rounded-xl border border-white/5 bg-black/40 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] hover:border-purple-500/30 transition-all text-zinc-400">
-            {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />} <span className="hidden sm:inline">Invite</span>
+          <button onClick={() => setShowReportModal(true)} className="h-10 w-10 flex items-center justify-center rounded-xl border border-white/5 text-zinc-600 hover:text-red-500 transition-colors"><Flag className="w-4 h-4" /></button>
+          <button onClick={() => setShowConfirm(true)} className="h-10 w-10 flex items-center justify-center rounded-xl border border-white/5 text-zinc-500 active:scale-90"><LogOut className="w-4 h-4" /></button>
+          <button onClick={copyInvite} className="h-10 px-4 rounded-xl border border-white/5 bg-black/40 flex items-center gap-2 text-[10px] font-black uppercase text-zinc-400 transition-all hover:border-purple-500/30">
+             {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />} <span>Invite</span>
           </button>
-          <button onClick={() => setShowConfirm(true)} className="h-11 w-11 flex items-center justify-center rounded-xl border border-white/5 text-zinc-500 hover:bg-zinc-900 transition-all active:scale-90"><LogOut className="w-4 h-4" /></button>
         </div>
       </header>
 
       {/* CHAT AREA */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 no-scrollbar">
-        <div className="max-w-5xl mx-auto space-y-8">
+      <div ref={chatAreaRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 no-scrollbar relative">
+        <div className="max-w-4xl mx-auto space-y-10 pb-4">
           {messages.map((msg, i) => {
             const isMe = msg.nickname === nickname;
+            const isImage = isImageUrl(msg.content);
             return (
-              <div key={msg.id || i}>
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
-                  <span className="text-[9px] font-black text-zinc-600 mb-2 px-1 uppercase flex items-center gap-2">
-                    {!isMe && <Terminal className="w-3 h-3 text-purple-500/50" />} {msg.nickname}
-                  </span>
-                  <div className={`px-5 py-3.5 rounded-2xl text-[15px] leading-relaxed max-w-[85%] md:max-w-[70%] shadow-2xl ${isMe ? "bg-purple-600 text-white rounded-tr-none" : "bg-zinc-900/60 border border-white/5 backdrop-blur-md rounded-tl-none text-zinc-200"}`}>
-                    {msg.content}
+              <div key={msg.id || i} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                <span className="text-[9px] font-black text-zinc-600 mb-2 px-1 uppercase flex items-center gap-2">
+                  {!isMe && <Terminal className="w-3 h-3 text-purple-500" />} {msg.nickname}
+                </span>
+                
+                <div className="group relative flex items-center gap-2 max-w-[85%]">
+                  <div className={`px-6 py-4 rounded-3xl text-[15px] shadow-2xl ${isMe ? "bg-purple-600 text-white rounded-tr-none" : "bg-zinc-900 border border-white/5 rounded-tl-none text-zinc-200"}`}>
+                    
+                    {/* QUOTE SECTION */}
+                    {msg.reply_metadata && (
+                      <div className="mb-2 p-2 rounded-xl bg-black/20 border-l-2 border-white/20 text-[11px] opacity-70 italic truncate">
+                        <span className="font-black not-italic text-white/50 uppercase block text-[9px]">@{msg.reply_metadata.nickname}</span>
+                        {msg.reply_metadata.content}
+                      </div>
+                    )}
+
+                    {isImage ? (
+                      <img src={msg.content} alt="Decrypted Transmission" className="rounded-xl max-h-64 w-full object-cover border border-white/10" />
+                    ) : (
+                      <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+                    )}
+                    
+                    {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                      <div className={`absolute -bottom-3 flex gap-1 ${isMe ? "right-0" : "left-0"}`}>
+                        {Object.entries(msg.reactions).map(([emoji, count]) => (
+                          <span key={emoji} className="bg-zinc-800 px-2 py-0.5 rounded-full text-[10px] border border-white/10 flex items-center gap-1 shadow-xl">
+                            {emoji} <span>{count as number}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </motion.div>
-                {(i + 1) % 10 === 0 && <AdsterraBanner />}
+                  
+                  {/* ACTIONS BAR */}
+                  <div className={`flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all ${isMe ? "order-first" : ""}`}>
+                    <button onClick={() => setReplyTo(msg)} className="p-2 text-zinc-600 hover:text-white"><Reply className="w-4 h-4" /></button>
+                    <button onClick={() => setActiveReactionPicker(msg.id)} className="p-2 text-zinc-600 hover:text-purple-400"><SmilePlus className="w-4 h-4" /></button>
+                  </div>
+
+                  <AnimatePresence>
+                    {activeReactionPicker === msg.id && (
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="absolute -top-12 z-50 bg-zinc-900 border border-white/10 p-1.5 rounded-2xl flex gap-1 shadow-2xl backdrop-blur-xl">
+                        {["🔥", "❤️", "😂", "🫡"].map(e => (
+                          <button key={e} onClick={() => addReaction(msg.id, msg.reactions, e)} className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-xl transition-all">{e}</button>
+                        ))}
+                        <button onClick={() => setActiveReactionPicker(null)} className="p-1.5 border-l border-white/5 ml-1"><X className="w-3 h-3 text-zinc-500" /></button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
             );
           })}
-          {typingUsers.length > 0 && (
-             <div className="flex gap-2 items-center text-[9px] font-black text-zinc-600 uppercase tracking-widest"><span className="w-1 h-1 bg-zinc-600 rounded-full animate-bounce" /> Transmitting...</div>
-          )}
-          <div ref={scrollRef} className="h-4" />
+          {typingUsers.length > 0 && <div className="text-[9px] font-black text-zinc-600 animate-pulse uppercase tracking-widest flex items-center gap-2"> <span className="w-1.5 h-1.5 bg-purple-500 rounded-full" /> Node Transmitting...</div>}
+          <div ref={scrollRef} className="h-1" />
         </div>
+
+        {/* JUMP TO BOTTOM */}
+        <AnimatePresence>
+          {showScrollButton && (
+            <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={scrollToBottom} className="fixed bottom-32 left-1/2 -translate-x-1/2 bg-purple-600 p-4 rounded-full shadow-2xl active:scale-90"><ChevronDown className="w-5 h-5" /></motion.button>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* INPUT BAR */}
-      <div className="p-4 md:p-8 bg-gradient-to-t from-black via-black/80 to-transparent shrink-0">
-        <form onSubmit={sendMessage} className="max-w-4xl mx-auto relative group">
-          <input type="text" value={newMessage} onChange={(e) => handleInputChange(e.target.value)} placeholder="Relay message to sector..." className="w-full bg-black/60 border border-white/10 rounded-2xl pl-6 pr-16 py-5 outline-none text-[15px] text-white focus:border-purple-500/40 transition-all shadow-2xl placeholder:text-zinc-700" />
-          <button type="submit" disabled={!newMessage.trim()} className="absolute right-3 top-1/2 -translate-y-1/2 p-3.5 bg-white text-black rounded-xl active:scale-90 transition-all disabled:opacity-0 group-focus-within:bg-purple-500 group-focus-within:text-white"><Send className="w-5 h-5" /></button>
-        </form>
+      <div className="p-4 md:p-10 bg-zinc-950/80 backdrop-blur-xl border-t border-white/5 shrink-0">
+        <div className="max-w-3xl mx-auto">
+          {/* REPLY PREVIEW */}
+          <AnimatePresence>
+            {replyTo && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="mb-2 p-3 bg-zinc-900 border border-white/10 rounded-2xl flex items-center justify-between">
+                <div className="min-w-0">
+                  <span className="text-[9px] font-black text-purple-400 uppercase block mb-1">Replying to @{replyTo.nickname}</span>
+                  <p className="text-xs text-zinc-400 truncate italic">{replyTo.content}</p>
+                </div>
+                <button onClick={() => setReplyTo(null)} className="p-2 hover:bg-white/5 rounded-lg text-zinc-500"><X className="w-4 h-4" /></button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="flex items-end gap-3 bg-zinc-900/50 border border-white/10 rounded-[1.8rem] p-2 focus-within:border-purple-500/40 shadow-inner">
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={newMessage}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+              onChange={(e) => {
+                setNewMessage(e.target.value);
+                if (channelRef.current) channelRef.current.track({ isTyping: e.target.value.length > 0, fp: myFingerprint });
+              }}
+              placeholder="Relay transmission..."
+              className="flex-1 bg-transparent border-none outline-none text-[15px] text-zinc-200 py-3 px-4 resize-none no-scrollbar placeholder:text-zinc-700 min-h-[44px] max-h-[200px]"
+            />
+            <button onClick={() => sendMessage()} disabled={!newMessage.trim()} className="p-3.5 bg-white text-black rounded-2xl active:scale-90 transition-all hover:bg-purple-500 hover:text-white mb-1 shrink-0"><Send className="w-5 h-5" /></button>
+          </div>
+        </div>
       </div>
     </div>
   );
