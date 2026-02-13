@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Hash, Send, LogOut, Copy, Check, Flag, X, Terminal, ChevronDown, SmilePlus, Reply, ShieldAlert } from "lucide-react";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
-/* AD COMPONENT */
 const AdsterraBanner = memo(() => {
   const adRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
@@ -16,22 +15,32 @@ const AdsterraBanner = memo(() => {
     if (adRef.current && !initialized.current) {
       initialized.current = true;
       const container = adRef.current;
-      const configScript = document.createElement("script");
-      configScript.type = "text/javascript";
-      configScript.innerHTML = `atOptions = { 'key' : 'fa3453ae0f13be3b5ba238031d224e99', 'format' : 'iframe', 'height' : 250, 'width' : 300, 'params' : {} };`;
-      const adScript = document.createElement("script");
-      adScript.type = "text/javascript";
-      adScript.src = "//www.highperformanceformat.com/fa3453ae0f13be3b5ba238031d224e99/invoke.js";
-      container.appendChild(configScript);
-      container.appendChild(adScript);
+      const config = document.createElement("script");
+      config.type = "text/javascript";
+      config.innerHTML = `atOptions = { 'key' : 'd5b7d02c3eed6fede79ae09ea0e30660', 'format' : 'iframe', 'height' : 250, 'width' : 300, 'params' : {} };`;
+      const invoke = document.createElement("script");
+      invoke.type = "text/javascript";
+      invoke.src = "//www.highperformanceformat.com/d5b7d02c3eed6fede79ae09ea0e30660/invoke.js";
+      container.appendChild(config);
+      container.appendChild(invoke);
     }
   }, []);
 
   return (
-    <div className="flex flex-col items-center my-8 py-6 border-y border-white/5 bg-zinc-950/40 shadow-inner">
-      <span className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.4em] mb-4">Transmission Sponsor</span>
-      <div ref={adRef} className="rounded-xl overflow-hidden border border-zinc-800 bg-black min-h-[250px] min-w-[300px] flex items-center justify-center shadow-2xl" />
-    </div>
+    <motion.div 
+      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      className="flex flex-col items-center my-10 py-8 border-y border-white/5 bg-zinc-950/40 relative w-full"
+    >
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#050505] px-4 py-1 border border-white/10 rounded-full flex items-center gap-2 z-10">
+        <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse" />
+        <span className="text-[8px] font-black text-zinc-500 uppercase tracking-[0.3em]">System Decryption: Sponsor</span>
+      </div>
+      
+      <div ref={adRef} className="rounded-2xl overflow-hidden border border-zinc-800 bg-black min-h-[250px] min-w-[300px] flex items-center justify-center shadow-[0_0_30px_rgba(0,0,0,0.5)] transition-all hover:border-purple-500/30" />
+      
+      <span className="mt-4 text-[7px] font-bold text-zinc-800 uppercase tracking-widest">Authorized Transmission Layer</span>
+    </motion.div>
   );
 });
 AdsterraBanner.displayName = "AdsterraBanner";
@@ -259,6 +268,10 @@ export default function ChatRoom() {
       {/* CHAT AREA */}
       <div ref={chatAreaRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 no-scrollbar relative">
         <div className="max-w-4xl mx-auto space-y-10 pb-4">
+          
+          {/* 1. STARTING AD */}
+          <AdsterraBanner />
+
           {messages.map((msg, i) => {
             const isMe = msg.nickname === nickname;
             const isImage = isImageUrl(msg.content);
@@ -313,6 +326,9 @@ export default function ChatRoom() {
                     )}
                   </AnimatePresence>
                 </div>
+
+                {/* 2. RECURRING ADS */}
+                {(i + 1) % 10 === 0 && <AdsterraBanner />}
               </div>
             );
           })}
