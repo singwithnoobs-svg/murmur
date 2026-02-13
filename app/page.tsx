@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCw, Hash, Users, MessageSquare, Globe, MessageCircle, X } from "lucide-react";
+import { RefreshCw, Hash, Users, MessageSquare, Globe, MessageCircle, X, Megaphone } from "lucide-react";
 import Navbar from "@/components/Navbar";
 
 const prefixes = ["Neon","Void","Silent","Dark","Solar","Lunar","Ghost","Cyber","Static","Crimson","Quantum","Hidden","Obsidian","Frozen","Infinite","Echo","Nova","Shadow","Digital","Zero"];
@@ -29,13 +29,9 @@ export default function LandingPage() {
 
   useEffect(() => { 
     const currentName = generateIdentity(); 
-    
-    // AUTO-ENTRY LOGIC
     const inviteId = searchParams.get("id");
     if (inviteId) {
-      // Ensure the identity is saved before redirecting
       sessionStorage.setItem("murmur_nickname", currentName);
-      // Directly move to the lobby with the specific room ID
       router.push(`/lobby?id=${inviteId}`);
     }
   }, [searchParams, router]);
@@ -58,11 +54,12 @@ export default function LandingPage() {
   ];
 
   return (
-    <div className="h-screen w-full bg-zinc-950 text-zinc-100 selection:bg-purple-500/30 overflow-hidden flex flex-col">
+    // CHANGED: h-screen to min-h-screen and overflow-hidden to overflow-y-auto to fix scrolling
+    <div className="min-h-screen w-full bg-zinc-950 text-zinc-100 selection:bg-purple-500/30 overflow-y-auto flex flex-col">
       <Navbar />
 
-      <main className="flex-1 flex items-center justify-center px-4 sm:px-6 relative">
-        <div className="max-w-xl w-full mx-auto text-center space-y-8 sm:y-12">
+      <main className="flex-1 flex items-center justify-center px-4 sm:px-6 py-12 relative">
+        <div className="max-w-xl w-full mx-auto text-center space-y-8">
           
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -105,7 +102,7 @@ export default function LandingPage() {
             </div>
           </motion.div>
 
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             <button
               onClick={() => setIsMenuOpen(true)}
               className="w-full py-5 sm:py-6 rounded-2xl bg-white text-black font-black text-xs sm:text-sm uppercase tracking-[0.2em] hover:bg-zinc-200 active:scale-95 transition-all shadow-[0_0_30px_rgba(255,255,255,0.1)]"
@@ -120,6 +117,14 @@ export default function LandingPage() {
             >
               <MessageCircle className="w-4 h-4" /> Join Discord
             </a>
+
+            {/* NEW PROMOTIONS BUTTON */}
+            <button
+              onClick={() => router.push('/promotions')}
+              className="flex items-center justify-center gap-3 py-4 rounded-2xl bg-red-500/5 border border-red-500/10 text-red-500/80 font-black text-[10px] uppercase tracking-widest hover:bg-red-500/10 transition-all active:scale-95"
+            >
+              <Megaphone className="w-4 h-4" /> Promotions & Sponsors
+            </button>
           </div>
         </div>
       </main>
