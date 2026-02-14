@@ -4,160 +4,184 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { motion } from "framer-motion";
-import { X, Zap } from "lucide-react";
+import { X, Radio, ShieldAlert } from "lucide-react";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 export default function MatchingPage() {
   const router = useRouter();
-  const [nickname, setNickname] = useState("");
-  const [status, setStatus] = useState("Initializing Ghost Protocol...");
+  const [status, setStatus] = useState("Initializing...");
   const [isBanned, setIsBanned] = useState(false);
-  const [banDetails, setBanDetails] = useState<any>(null);
+  const [progress, setProgress] = useState(0);
   
   const protocolStarted = useRef(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<any>(null);
+  const myRecordId = useRef<string | null>(null);
+  const nicknameRef = useRef<string | null>(null);
+  const fallbackInterval = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const savedName = sessionStorage.getItem("murmur_nickname");
-    if (!savedName) { router.push("/"); return; }
-    setNickname(savedName);
-    checkBanAndStart(savedName);
-
-    // CLEANUP: If user closes tab or leaves
-    return () => {
-      cleanup();
-    };
+    const timer = setInterval(() => {
+      setProgress((prev) => (prev < 95 ? prev + 1 : prev));
+    }, 500);
+    return () => clearInterval(timer);
   }, []);
 
-  const cleanup = async () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    if (nickname) {
-      // Deletes BOTH the signal and the matchmaking record for this nickname
-      await supabase.from("matchmaking")
-        .delete()
-        .or(`nickname.eq.${nickname},partner_found.eq.${nickname}`);
-    }
-    if (channelRef.current) supabase.removeChannel(channelRef.current);
-  };
+  useEffect(() => {
+    const init = async () => {
+      const savedName = sessionStorage.getItem("murmur_nickname");
+      if (!savedName) { router.push("/"); return; }
+      
+      nicknameRef.current = savedName;
+      const fpLoad = await FingerprintJS.load();
+      const fp = await fpLoad.get();
+      
+      const banned = await checkBan(fp.visitorId);
+      if (!banned) startMatchmaking(savedName, fp.visitorId);
+    };
 
-  const checkBanAndStart = async (name: string) => {
-    const fp = await (await FingerprintJS.load()).get();
+    init();
+
+    return () => {
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
+      if (fallbackInterval.current) clearInterval(fallbackInterval.current);
+      if (nicknameRef.current) {
+        supabase.from("matchmaking").delete().eq("nickname", nicknameRef.current).then();
+      }
+    };
+  }, [router]);
+
+  const checkBan = async (fp: string) => {
     const { data } = await supabase.from("banned_fingerprints")
-      .select("*")
-      .eq("fingerprint", fp.visitorId)
-      .maybeSingle();
-
-    if (data && (!data.expires_at || new Date(data.expires_at) > new Date())) {
-      setBanDetails(data);
-      setIsBanned(true);
-    } else {
-      startMatchmaking(name);
-    }
+      .select("*").eq("fingerprint", fp).maybeSingle();
+    if (data) { setIsBanned(true); return true; }
+    return false;
   };
 
-  const startMatchmaking = async (name: string) => {
+  const startMatchmaking = async (name: string, fp: string) => {
     if (protocolStarted.current) return;
     protocolStarted.current = true;
 
-    try {
-      setStatus("Scanning Frequencies...");
+    // 1. Clear old ghosts
+    await supabase.from("matchmaking").delete().eq("nickname", name);
+
+    setStatus("Searching for signals...");
+
+    // 2. Look for a Host
+    const { data: host } = await supabase
+      .from("matchmaking")
+      .select("*")
+      .is("room_id", null)
+      .neq("nickname", name)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (host) {
+      // JOINER LOGIC
+      setStatus("Linking Protocol...");
+      const roomId = `room_${Math.random().toString(36).substring(2, 11)}`;
       
-      // 1. Attempt to find an existing signal (Waiters)
-      const { data: queue } = await supabase
+      await supabase.from("rooms").insert([{ id: roomId }]);
+
+      const { error } = await supabase
         .from("matchmaking")
-        .select("*")
-        .is("partner_found", null)
-        .neq("nickname", name) 
-        .order("created_at", { ascending: true })
-        .limit(1);
+        .update({ room_id: roomId, partner_found: name })
+        .eq("id", host.id);
 
-      if (queue && queue.length > 0) {
-        const partner = queue[0];
-        const roomId = `room_${Math.random().toString(36).substring(2, 12)}`;
-
-        // Attempt to "Snap up" the partner
-        const { data: claimed } = await supabase
-          .from("matchmaking")
-          .delete()
-          .eq("id", partner.id)
-          .select();
-
-        if (claimed && claimed.length > 0) {
-          setStatus("Link Established!");
-          
-          // Create the room
-          await supabase.from("rooms").insert([{ id: roomId, created_by: name }]);
-          
-          // Leave a "Signal" for the partner to find the room
-          await supabase.from("matchmaking").insert([{ 
-            nickname: `SIGNAL_${partner.nickname}`, 
-            partner_found: partner.nickname, 
-            room_id: roomId 
-          }]);
-          
-          router.push(`/random-chat?id=${roomId}`);
-        } else {
-          // If claim failed, retry immediately
-          protocolStarted.current = false;
-          startMatchmaking(name);
-        }
-      } else {
-        // 2. No one found, Create our own signal and wait
-        setStatus("Broadcasting Signal...");
-        
-        // Ensure old records of me are gone before inserting
-        await supabase.from("matchmaking").delete().eq("nickname", name);
-        await supabase.from("matchmaking").insert([{ nickname: name }]);
-
-        intervalRef.current = setInterval(async () => {
-          // Look for the "SIGNAL_" packet someone sent us
-          const { data: signal } = await supabase
-            .from("matchmaking")
-            .select("*")
-            .eq("partner_found", name) 
-            .maybeSingle();
-
-          if (signal?.room_id) {
-            const finalRoomId = signal.room_id;
-            clearInterval(intervalRef.current!);
-            
-            // Clean up our signal packet
-            await supabase.from("matchmaking").delete().eq("id", signal.id);
-            // Clean up our entry in the queue
-            await supabase.from("matchmaking").delete().eq("nickname", name);
-            
-            router.push(`/random-chat?id=${finalRoomId}`);
-          }
-        }, 1500);
+      if (!error) {
+        router.push(`/random-chat?id=${roomId}`);
+        return;
       }
-    } catch (e) {
-      protocolStarted.current = false;
-      setStatus("Signal Lost. Retrying...");
     }
+
+    // 3. Become the HOST
+    setStatus("Broadcasting Signal...");
+    const { data: myNewRecord, error: insertError } = await supabase
+      .from("matchmaking")
+      .insert([{ nickname: name, fingerprint: fp }])
+      .select()
+      .single();
+
+    if (insertError || !myNewRecord) {
+      protocolStarted.current = false;
+      return;
+    }
+
+    myRecordId.current = myNewRecord.id;
+
+    // 4. THE HANDSHAKE (Realtime)
+    channelRef.current = supabase
+      .channel(`match-${myNewRecord.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'matchmaking', filter: `id=eq.${myNewRecord.id}` },
+        (payload) => {
+          if (payload.new.room_id) {
+            handleSuccessfulMatch(payload.new.room_id);
+          }
+        }
+      )
+      .subscribe();
+
+    // 5. THE FALLBACK (If Realtime is disabled or fails)
+    fallbackInterval.current = setInterval(async () => {
+      const { data } = await supabase
+        .from("matchmaking")
+        .select("room_id")
+        .eq("id", myNewRecord.id)
+        .maybeSingle();
+      
+      if (data?.room_id) {
+        handleSuccessfulMatch(data.room_id);
+      }
+    }, 2000);
   };
 
-  const abort = async () => {
-    await cleanup();
-    router.push("/");
+  const handleSuccessfulMatch = (roomId: string) => {
+    if (fallbackInterval.current) clearInterval(fallbackInterval.current);
+    setStatus("Signal Locked!");
+    router.push(`/random-chat?id=${roomId}`);
   };
 
-  if (isBanned) return <div className="h-screen bg-black text-white flex items-center justify-center p-10 text-center">Access Revoked: {banDetails?.reason}</div>;
+  if (isBanned) return (
+    <div className="h-screen bg-[#020105] text-purple-500 flex flex-col items-center justify-center p-10">
+      <ShieldAlert className="w-16 h-16 mb-4" />
+      <h1 className="font-black uppercase tracking-tighter">System Banned</h1>
+    </div>
+  );
 
   return (
-    <div className="h-[100dvh] bg-zinc-950 text-zinc-100 flex flex-col items-center justify-center p-6 overflow-hidden">
-      {/* ... (Your existing UI remains the same) ... */}
-      <div className="relative z-10 w-full max-w-sm flex flex-col items-center">
+    <div className="h-[100dvh] bg-[#020105] text-zinc-100 flex flex-col items-center justify-center p-6 overflow-hidden relative font-sans">
+      <div className="absolute inset-0 z-0">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-[radial-gradient(circle,rgba(168,85,247,0.15)_0%,transparent_70%)]" />
+      </div>
+
+      <div className="relative z-10 w-full max-w-xs flex flex-col items-center">
         <div className="relative mb-12">
-          <motion.div animate={{ rotate: 360 }} transition={{ duration: 8, repeat: Infinity, ease: "linear" }} className="w-32 h-32 border-2 border-dashed border-zinc-800 rounded-full" />
-          <motion.div animate={{ rotate: -360 }} transition={{ duration: 4, repeat: Infinity, ease: "linear" }} className="absolute inset-2 border-b-2 border-purple-500 rounded-full" />
-          <div className="absolute inset-0 flex items-center justify-center"><Zap className="w-8 h-8 text-purple-500 animate-pulse" /></div>
+          <motion.div 
+            animate={{ rotate: 360 }} transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+            className="w-44 h-44 rounded-full border border-purple-500/20 flex items-center justify-center"
+          >
+             <div className="w-36 h-36 rounded-full border-t-2 border-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.3)]" />
+          </motion.div>
+          <Radio className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 text-purple-400 animate-pulse" />
         </div>
-        <div className="text-center space-y-2 mb-10">
-          <h2 className="text-2xl font-black uppercase italic tracking-tighter">Ghosting <span className="text-purple-600">Active</span></h2>
-          <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">{status}</p>
+
+        <div className="text-center w-full space-y-6">
+          <h2 className="text-3xl font-black uppercase italic tracking-tighter text-white">Matching</h2>
+          <p className="text-[11px] font-bold text-purple-400 uppercase tracking-[0.4em]">{status}</p>
+          
+          <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+            <motion.div animate={{ width: `${progress}%` }} className="h-full bg-purple-600 shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
+          </div>
+
+          <button 
+            onClick={() => router.push("/")}
+            className="mt-8 px-10 py-3 rounded-full bg-white/5 border border-white/10 text-zinc-400 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all"
+          >
+            Abort
+          </button>
         </div>
-        <button onClick={abort} className="flex items-center gap-2 text-zinc-600 hover:text-white transition-all text-[10px] font-black uppercase tracking-widest"><X className="w-4 h-4" /> Abort Session</button>
       </div>
     </div>
   );
