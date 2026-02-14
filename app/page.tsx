@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCw, Hash, Users, MessageSquare, Globe, X, Megaphone, Zap } from "lucide-react";
+import { RefreshCw, Hash, Users, MessageSquare, Globe, X, Megaphone, Zap, ShieldCheck } from "lucide-react";
 import Navbar from "@/components/Navbar";
 
 const prefixes = ["Neon","Void","Silent","Dark","Solar","Lunar","Ghost","Cyber","Static","Crimson","Quantum","Hidden","Obsidian","Frozen","Infinite","Echo","Nova","Shadow","Digital","Zero"];
@@ -54,10 +54,28 @@ export default function LandingPage() {
   ];
 
   return (
-    <div className="min-h-screen w-full bg-zinc-950 text-zinc-100 selection:bg-purple-500/30 overflow-y-auto flex flex-col">
+    <div className="min-h-screen w-full bg-[#030005] text-zinc-100 selection:bg-purple-500/30 overflow-y-auto flex flex-col relative">
+      
+      {/* ATMOSPHERIC BACKGROUND ELEMENTS */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        {/* Deep Purple Radial Glow */}
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-purple-900/20 blur-[120px] rounded-full opacity-60" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-indigo-900/20 blur-[140px] rounded-full opacity-40" />
+        
+        {/* Animated Center Bloom */}
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.1, 1],
+            opacity: [0.3, 0.5, 0.3] 
+          }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[70%] h-[50%] bg-purple-600/5 blur-[120px] rounded-full"
+        />
+      </div>
+
       <Navbar />
 
-      <main className="flex-1 flex items-center justify-center px-4 sm:px-6 py-12 relative">
+      <main className="flex-1 flex items-center justify-center px-4 sm:px-6 py-12 relative z-10">
         <div className="max-w-xl w-full mx-auto text-center space-y-10">
           
           <motion.div
@@ -65,14 +83,17 @@ export default function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             className="space-y-4"
           >
-            <p className="text-zinc-500 font-black uppercase tracking-[0.4em] text-[10px]">
-              Encrypted • Anonymous • Instant
-            </p>
+            <div className="flex items-center justify-center gap-2 mb-2">
+                <ShieldCheck className="w-3 h-3 text-purple-400" />
+                <p className="text-purple-400/80 font-black uppercase tracking-[0.5em] text-[9px]">
+                    Encrypted • Anonymous • Instant
+                </p>
+            </div>
             {searchParams.get("id") && (
               <motion.div 
                 initial={{ scale: 0.9, opacity: 0 }} 
                 animate={{ scale: 1, opacity: 1 }}
-                className="inline-block px-4 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[10px] font-black uppercase tracking-widest"
+                className="inline-block px-4 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-[10px] font-black uppercase tracking-widest backdrop-blur-sm"
               >
                 Syncing with Invite: {searchParams.get("id")}
               </motion.div>
@@ -83,49 +104,53 @@ export default function LandingPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-zinc-900/30 border border-white/5 p-4 sm:p-6 rounded-[2.5rem] backdrop-blur-md relative group"
+            className="bg-zinc-900/40 border border-white/10 p-5 sm:p-7 rounded-[2.5rem] backdrop-blur-xl relative group shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
           >
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-zinc-950 border border-white/10 px-4 py-1 rounded-full">
-              <span className="text-[9px] uppercase tracking-[0.2em] font-black text-zinc-500">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#12051a] border border-purple-500/30 px-5 py-1 rounded-full shadow-lg">
+              <span className="text-[10px] uppercase tracking-[0.3em] font-black text-purple-300">
                 Ghost Identity
               </span>
             </div>
 
-            <div className="flex items-center justify-between gap-3 bg-black/40 border border-white/5 p-4 rounded-3xl mt-2">
+            <div className="flex items-center justify-between gap-4 bg-black/40 border border-white/5 p-5 rounded-3xl mt-2 transition-all group-hover:border-purple-500/20">
               <div className="flex flex-col text-left overflow-hidden">
-                <span className="text-2xl sm:text-3xl font-mono text-white font-bold tracking-tighter truncate">
+                <span className="text-2xl sm:text-4xl font-mono text-white font-bold tracking-tighter truncate drop-shadow-[0_0_15px_rgba(168,85,247,0.3)]">
                   {name}
                 </span>
-                <span className="text-[8px] text-zinc-600 uppercase font-black tracking-widest mt-1">Temporary Frequency Assigned</span>
+                <span className="text-[8px] text-zinc-500 uppercase font-black tracking-[0.2em] mt-1.5 flex items-center gap-2">
+                    <span className="w-1 h-1 bg-purple-500 rounded-full animate-pulse" />
+                    Temporary Node Active
+                </span>
               </div>
               <button
                 onClick={generateIdentity}
-                className="p-4 bg-white/5 hover:bg-white/10 rounded-2xl text-purple-500 transition-all active:rotate-180 duration-500 shrink-0 border border-white/5"
+                className="p-4 bg-white/5 hover:bg-purple-500 hover:text-white rounded-2xl text-purple-400 transition-all active:rotate-180 duration-500 shrink-0 border border-white/5"
               >
                 <RefreshCw className="w-5 h-5" />
               </button>
             </div>
           </motion.div>
 
-          <div className="flex flex-col items-center gap-6">
+          <div className="flex flex-col items-center gap-8">
             {/* LARGE HERO BUTTON */}
             <motion.button
-              whileHover={{ scale: 1.02, boxShadow: "0 0 40px rgba(168, 85, 247, 0.2)" }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.02, boxShadow: "0 0 50px rgba(168, 85, 247, 0.25)" }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => setIsMenuOpen(true)}
-              className="w-full py-8 sm:py-10 rounded-[2.5rem] bg-white text-black font-black text-lg sm:text-xl uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-4 relative overflow-hidden group"
+              className="w-full py-9 sm:py-11 rounded-[2.5rem] bg-white text-black font-black text-xl sm:text-2xl uppercase tracking-[0.4em] transition-all flex items-center justify-center gap-4 relative overflow-hidden group shadow-2xl"
             >
-              <Zap className="w-6 h-6 fill-black group-hover:animate-pulse" />
+              <Zap className="w-6 h-6 fill-black group-hover:scale-125 transition-transform" />
               Start Chatting
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+              {/* Subtle shimmer effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
             </motion.button>
 
-            {/* SECONDARY ACTION */}
+            {/* CONTACT TEAM ACTION */}
             <button
               onClick={() => router.push('/promotions')}
-              className="flex items-center gap-2 px-6 py-3 rounded-full bg-zinc-900/50 border border-white/5 text-zinc-500 font-black text-[9px] uppercase tracking-[0.2em] hover:text-white hover:bg-zinc-800 transition-all"
+              className="flex items-center gap-2.5 px-8 py-3.5 rounded-full bg-white/5 border border-white/5 text-zinc-400 font-black text-[10px] uppercase tracking-[0.3em] hover:text-purple-300 hover:bg-purple-500/10 hover:border-purple-500/20 transition-all backdrop-blur-sm"
             >
-              <Megaphone className="w-3 h-3" /> Contact Team & Support
+              <Megaphone className="w-3.5 h-3.5" /> Contact Team & Support
             </button>
           </div>
         </div>
@@ -138,18 +163,18 @@ export default function LandingPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 sm:p-6 bg-black/95 backdrop-blur-xl"
+            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 sm:p-6 bg-[#030005]/95 backdrop-blur-2xl"
           >
             <motion.div 
-              initial={{ scale: 0.9, y: 40 }}
+              initial={{ scale: 0.95, y: 40 }}
               animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 40 }}
-              className="bg-zinc-900 border border-white/10 w-full max-w-lg rounded-[3rem] overflow-hidden shadow-2xl mb-4 sm:mb-0"
+              exit={{ scale: 0.95, y: 40 }}
+              className="bg-zinc-900 border border-white/10 w-full max-w-lg rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(168,85,247,0.15)] mb-4 sm:mb-0"
             >
-              <div className="p-8 border-b border-white/5 flex justify-between items-center bg-zinc-900/50">
+              <div className="p-9 border-b border-white/5 flex justify-between items-center bg-zinc-900/50">
                 <div>
                   <h3 className="text-2xl font-black uppercase tracking-tighter italic text-white leading-none">Protocols</h3>
-                  <p className="text-[9px] text-zinc-500 uppercase tracking-widest mt-2 font-black">Select Transmission Mode</p>
+                  <p className="text-[10px] text-purple-400 uppercase tracking-[0.3em] mt-2.5 font-black">Select Transmission Mode</p>
                 </div>
                 <button 
                   onClick={() => setIsMenuOpen(false)}
@@ -159,26 +184,26 @@ export default function LandingPage() {
                 </button>
               </div>
 
-              <div className="p-4 grid gap-3 max-h-[60vh] overflow-y-auto no-scrollbar">
+              <div className="p-5 grid gap-4 max-h-[60vh] overflow-y-auto no-scrollbar">
                 {menuOptions.map((opt) => (
                   <button
                     key={opt.name}
                     onClick={() => handleProtocolSelection(opt.path)}
-                    className="flex items-center gap-5 p-5 rounded-[2rem] hover:bg-white hover:text-black group transition-all text-left border border-white/5 hover:border-white shadow-lg"
+                    className="flex items-center gap-6 p-6 rounded-[2.2rem] hover:bg-white hover:text-black group transition-all text-left border border-white/5 hover:border-white shadow-xl"
                   >
-                    <div className="w-14 h-14 shrink-0 rounded-2xl bg-zinc-800 flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
+                    <div className="w-16 h-16 shrink-0 rounded-2xl bg-zinc-800 flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
                       {opt.icon}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="font-black uppercase text-sm tracking-widest">{opt.name}</div>
-                      <div className="text-xs text-zinc-500 group-hover:text-black/60 font-bold mt-1 uppercase tracking-tighter">{opt.desc}</div>
+                      <div className="font-black uppercase text-[15px] tracking-widest">{opt.name}</div>
+                      <div className="text-[11px] text-zinc-500 group-hover:text-black/60 font-bold mt-1 uppercase tracking-tighter">{opt.desc}</div>
                     </div>
                   </button>
                 ))}
               </div>
 
-              <div className="p-8 text-center bg-black/20">
-                <p className="text-[8px] text-zinc-700 font-black uppercase tracking-[0.4em]">
+              <div className="p-8 text-center bg-black/40">
+                <p className="text-[9px] text-zinc-600 font-black uppercase tracking-[0.5em]">
                   Secure Peer-to-Peer Tunnel Active 
                 </p>
               </div>
