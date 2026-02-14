@@ -3,16 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Reply, X, Globe, CornerDownRight, AlertCircle, ArrowLeft } from "lucide-react";
+import { Send, Reply, X, Globe, CornerDownRight, AlertCircle, ArrowLeft, Zap } from "lucide-react";
 import Link from "next/link";
 
-/* ---------------- COLOR ENGINE ---------------- */
 const getUserColor = (name: string) => {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return `hsl(${Math.abs(hash) % 360}, 75%, 65%)`;
+  return `hsl(${Math.abs(hash) % 360}, 85%, 70%)`;
 };
 
 export default function GlobalChat() {
@@ -38,10 +37,7 @@ export default function GlobalChat() {
     channel
       .on("presence", { event: "sync" }, () => setOnlineCount(Object.keys(channel.presenceState()).length))
       .on("broadcast", { event: "CHAT" }, ({ payload }) => {
-        setMessages((m) => {
-          const newMessages = [...m, payload];
-          return newMessages.slice(-100);
-        });
+        setMessages((m) => [...m, payload].slice(-100));
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") await channel.track({ online_at: new Date().toISOString() });
@@ -50,7 +46,12 @@ export default function GlobalChat() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: "auto" }); }, [messages]);
+  // Scroll to bottom whenever messages update
+  useEffect(() => { 
+    if (scrollRef.current) {
+      scrollRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
 
   useEffect(() => {
     if (cooldown > 0) {
@@ -62,13 +63,7 @@ export default function GlobalChat() {
   const sendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     const now = Date.now();
-    
-    if (now - lastSent.current < 5000) {
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 3000);
-      return;
-    }
-
+    if (now - lastSent.current < 5000) { setShowToast(true); setTimeout(() => setShowToast(false), 3000); return; }
     if (!input.trim()) return;
 
     const payload = {
@@ -80,12 +75,7 @@ export default function GlobalChat() {
     };
 
     await channelRef.current.send({ type: "broadcast", event: "CHAT", payload });
-    
-    setMessages((m) => {
-      const next = [...m, payload];
-      return next.slice(-100);
-    });
-
+    setMessages((m) => [...m, payload].slice(-100));
     setInput("");
     setReplyTo(null);
     lastSent.current = now;
@@ -93,76 +83,84 @@ export default function GlobalChat() {
   };
 
   return (
-    <div className="relative flex flex-col h-[100dvh] bg-[#020202] text-zinc-100 font-sans overflow-hidden">
+    // Main Container: Fixed at 100vh, no scroll on body
+    <div className="flex flex-col h-screen w-full bg-[#05010a] text-zinc-100 overflow-hidden relative">
       
-      {/* TOAST POPUP */}
+      {/* BACKGROUND DECOR */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-600/10 blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-900/10 blur-[120px]" />
+      </div>
+
+      {/* TOAST */}
       <AnimatePresence>
         {showToast && (
           <motion.div 
-            initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 20 }} exit={{ opacity: 0, y: -20 }}
-            className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] bg-red-600 text-white px-5 py-2 rounded-full flex items-center gap-2 shadow-2xl text-[12px] font-black uppercase tracking-tighter"
+            initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 10 }} exit={{ opacity: 0, y: -20 }}
+            className="absolute top-24 left-1/2 -translate-x-1/2 z-[100] bg-red-600 px-6 py-2 rounded-full flex items-center gap-2 shadow-2xl text-[12px] font-black uppercase tracking-widest"
           >
             <AlertCircle className="w-4 h-4" /> Wait {cooldown}s
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* HEADER */}
-      <header className="relative z-10 h-14 border-b border-white/5 bg-black/40 backdrop-blur-md flex items-center justify-between px-6 shrink-0">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="p-2 -ml-2 hover:bg-white/5 rounded-full transition-colors group">
-            <ArrowLeft className="w-5 h-5 text-zinc-500 group-hover:text-white transition-colors" />
+      {/* 1. HEADER (Fixed Height) */}
+      <header className="relative z-10 h-20 border-b border-purple-500/10 bg-black/40 backdrop-blur-xl flex items-center justify-between px-8 shrink-0">
+        <div className="flex items-center gap-6">
+          <Link href="/" className="p-3 bg-white/5 hover:bg-purple-600/20 rounded-2xl transition-all border border-white/5">
+            <ArrowLeft className="w-6 h-6 text-zinc-400" />
           </Link>
-          
-          <div className="flex items-center gap-2">
-            <Globe className="w-4 h-4 text-purple-500" />
-            <h2 className="font-black text-[10px] uppercase tracking-[0.4em]">Global</h2>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <Globe className="w-5 h-5 text-purple-500 animate-pulse" />
+              <h2 className="font-black text-[14px] uppercase tracking-[0.5em]">Global_Network</h2>
+            </div>
+            <span className="text-[10px] font-black text-purple-400/40 uppercase">Latency: 12ms</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold text-zinc-600 tracking-widest">{onlineCount} NODES</span>
+        <div className="flex items-center gap-3 bg-purple-500/5 px-4 py-2 rounded-full border border-purple-500/10">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-ping" />
+          <span className="text-[11px] font-black text-zinc-400 uppercase tracking-widest">{onlineCount} Nodes</span>
         </div>
       </header>
 
-      {/* CHAT STREAM */}
-      <div className="relative z-10 flex-1 overflow-y-auto pt-4 no-scrollbar">
-        <div className="max-w-[85%] mx-auto space-y-2.5">
+      {/* 2. CHAT STREAM (Scrollable Area) */}
+      <main className="flex-1 overflow-y-auto z-10 no-scrollbar py-10 px-6">
+        <div className="max-w-3xl mx-auto space-y-8">
           <AnimatePresence initial={false}>
             {messages.map((msg) => {
               const isMe = msg.nickname === nickname;
-              const userColor = isMe ? "#a855f7" : getUserColor(msg.nickname);
-              const mentionedMe = msg.reply_to?.nickname === nickname;
+              const userColor = isMe ? "#c084fc" : getUserColor(msg.nickname);
 
               return (
-                <motion.div key={msg.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="group">
+                <motion.div key={msg.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                   <div className={`
-                    relative px-4 py-3 rounded-2xl transition-all border
-                    ${isMe ? "bg-purple-600/5 border-purple-500/20" : "bg-zinc-900/40 border-white/[0.03]"}
-                    ${mentionedMe ? "ring-1 ring-amber-500/50 bg-amber-500/5" : ""}
+                    relative max-w-[85%] px-8 py-6 rounded-[2.5rem] transition-all border shadow-2xl
+                    ${isMe ? "bg-purple-600/10 border-purple-500/30 rounded-tr-none" : "bg-zinc-900/60 border-white/[0.05] rounded-tl-none"}
                   `}>
                     {msg.reply_to && (
-                      <div className="flex items-center gap-2 mb-2 p-2 bg-black/40 rounded-lg border-l-2 border-purple-500/50">
-                        <CornerDownRight className="w-3 h-3 text-purple-500 shrink-0" />
-                        <span className="text-[11px] text-zinc-500 truncate italic">
+                      <div className="flex items-center gap-3 mb-4 p-4 bg-black/40 rounded-2xl border-l-4 border-purple-500/50">
+                        <CornerDownRight className="w-4 h-4 text-purple-500 shrink-0" />
+                        <span className="text-[13px] text-zinc-500 truncate">
                           <b style={{ color: getUserColor(msg.reply_to.nickname) }}>@{msg.reply_to.nickname}</b>: {msg.reply_to.content}
                         </span>
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between mb-0.5">
+                    <div className="flex items-center justify-between mb-2 gap-8">
                       <button 
                         onClick={() => setReplyTo(msg)}
-                        className="text-[10px] font-black uppercase tracking-widest hover:underline text-left" 
+                        className="text-[13px] font-black uppercase tracking-widest hover:brightness-125 transition-all" 
                         style={{ color: userColor }}
                       >
                         {msg.nickname}
                       </button>
-                      <button onClick={() => setReplyTo(msg)} className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-white transition-all">
-                        <Reply className="w-3.5 h-3.5" />
+                      <button onClick={() => setReplyTo(msg)} className="opacity-0 group-hover:opacity-100 p-1 text-zinc-600 hover:text-purple-400 transition-all">
+                        <Reply className="w-4 h-4" />
                       </button>
                     </div>
 
-                    <p className={`text-[15px] leading-snug ${isMe ? "text-purple-50" : "text-zinc-300"}`}>
+                    <p className={`text-[18px] leading-relaxed ${isMe ? "text-purple-50" : "text-zinc-200"}`}>
                       {msg.content}
                     </p>
                   </div>
@@ -170,34 +168,39 @@ export default function GlobalChat() {
               );
             })}
           </AnimatePresence>
-          <div ref={scrollRef} className="h-6" />
+          <div ref={scrollRef} className="h-4" />
         </div>
-      </div>
+      </main>
 
-      {/* INPUT AREA */}
-      <div className="relative z-10 p-6 bg-black/90 backdrop-blur-2xl border-t border-white/5">
-        <div className="max-w-[85%] mx-auto">
+      {/* 3. INPUT AREA (Fixed at Bottom) */}
+      <footer className="relative z-10 p-8 bg-black/60 backdrop-blur-3xl border-t border-purple-500/10 shrink-0">
+        <div className="max-w-2xl mx-auto">
           <AnimatePresence>
             {replyTo && (
-              <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="bg-purple-600/10 border border-purple-500/20 border-b-0 rounded-t-xl px-4 py-2 flex justify-between items-center overflow-hidden">
-                <span className="text-[10px] text-zinc-500 font-bold uppercase truncate">Replying to {replyTo.nickname}</span>
-                <X className="w-4 h-4 text-zinc-500 cursor-pointer" onClick={() => setReplyTo(null)} />
+              <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="bg-purple-600/20 border border-purple-500/30 border-b-0 rounded-t-[2rem] px-8 py-3 flex justify-between items-center overflow-hidden">
+                <span className="text-[11px] text-purple-300 font-black uppercase tracking-widest">Replying to {replyTo.nickname}</span>
+                <X className="w-4 h-4 text-purple-300 cursor-pointer" onClick={() => setReplyTo(null)} />
               </motion.div>
             )}
           </AnimatePresence>
-          <form onSubmit={sendMessage} className="flex items-center bg-zinc-900/60 border border-white/10 p-1.5 rounded-2xl group focus-within:border-purple-500/40 transition-all">
+          
+          <form onSubmit={sendMessage} className={`
+            flex items-center bg-zinc-900/90 border p-2 shadow-2xl transition-all duration-300
+            ${replyTo ? "rounded-b-[2rem] border-purple-500/40" : "rounded-[2.5rem] border-white/10"}
+            focus-within:border-purple-500/60
+          `}>
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Broadcast..."
-              className="flex-1 bg-transparent px-4 py-3 text-sm outline-none"
+              placeholder="Inject protocol..."
+              className="flex-1 bg-transparent px-8 py-4 text-[17px] outline-none placeholder:text-zinc-700 placeholder:uppercase placeholder:text-[10px] placeholder:tracking-widest"
             />
-            <button type="submit" className="p-3 bg-white text-black rounded-xl hover:bg-purple-500 hover:text-white transition-all">
-              <Send className="w-5 h-5" />
+            <button type="submit" className="p-5 bg-purple-600 text-white rounded-[2rem] hover:bg-purple-500 transition-all shadow-lg shadow-purple-600/20">
+              <Send className="w-6 h-6" />
             </button>
           </form>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }
