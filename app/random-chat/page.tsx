@@ -1,50 +1,12 @@
 "use client";
 
-import { useEffect, useState, useRef, Suspense, memo } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, LogOut, RefreshCw, Zap, Loader2, Flag, X, UserX, Reply, CornerDownRight, Terminal } from "lucide-react";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
-import { VoiceRecorder } from "@/components/VoiceRecorder"; // Ensure path is correct
-
-const AdsterraBanner = memo(() => {
-  const adRef = useRef<HTMLDivElement>(null);
-  const initialized = useRef(false);
-
-  useEffect(() => {
-    if (adRef.current && !initialized.current) {
-      initialized.current = true;
-      const container = adRef.current;
-      const config = document.createElement("script");
-      config.type = "text/javascript";
-      config.innerHTML = `atOptions = { 'key' : 'd5b7d02c3eed6fede79ae09ea0e30660', 'format' : 'iframe', 'height' : 250, 'width' : 300, 'params' : {} };`;
-      const invoke = document.createElement("script");
-      invoke.type = "text/javascript";
-      invoke.src = "//www.highperformanceformat.com/d5b7d02c3eed6fede79ae09ea0e30660/invoke.js";
-      container.appendChild(config);
-      container.appendChild(invoke);
-    }
-  }, []);
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      className="flex flex-col items-center my-10 py-8 border-y border-white/5 bg-zinc-950/40 relative w-full"
-    >
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#050505] px-4 py-1 border border-white/10 rounded-full flex items-center gap-2 z-10">
-        <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse" />
-        <span className="text-[8px] font-black text-zinc-500 uppercase tracking-[0.3em]">System Decryption: Sponsor</span>
-      </div>
-      
-      <div ref={adRef} className="rounded-2xl overflow-hidden border border-zinc-800 bg-black min-h-[250px] min-w-[300px] flex items-center justify-center shadow-[0_0_30px_rgba(0,0,0,0.5)] transition-all hover:border-purple-500/30" />
-      
-      <span className="mt-4 text-[7px] font-bold text-zinc-800 uppercase tracking-widest">Authorized Transmission Layer</span>
-    </motion.div>
-  );
-});
-AdsterraBanner.displayName = "AdsterraBanner";
+import { VoiceRecorder } from "@/components/VoiceRecorder"; 
 
 function ChatContent() {
   const router = useRouter();
@@ -270,8 +232,6 @@ function ChatContent() {
 
       <div className="flex-1 overflow-y-auto p-4 md:p-8 no-scrollbar scroll-smooth">
         <div className="max-w-4xl mx-auto space-y-10">
-          <AdsterraBanner />
-
           <AnimatePresence mode="popLayout">
             {messages.map((msg, i) => {
               const isMe = msg.nickname === nickname;
@@ -310,7 +270,6 @@ function ChatContent() {
                       )}
                     </div>
                   </div>
-                  {(i + 1) % 10 === 0 && <AdsterraBanner />}
                 </motion.div>
               );
             })}
