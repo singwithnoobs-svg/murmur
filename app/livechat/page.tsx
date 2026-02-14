@@ -1,39 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, memo } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, Reply, X, Globe, CornerDownRight, AlertCircle, ArrowLeft } from "lucide-react";
-import Link from "next/link"; // For navigation
-
-/* ---------------- ADSTERRA COMPONENT ---------------- */
-const AdsterraBanner = memo(() => {
-  const adRef = useRef<HTMLDivElement>(null);
-  const initialized = useRef(false);
-
-  useEffect(() => {
-    if (adRef.current && !initialized.current) {
-      initialized.current = true;
-      const container = adRef.current;
-      const config = document.createElement("script");
-      config.type = "text/javascript";
-      config.innerHTML = `atOptions = { 'key' : 'd5b7d02c3eed6fede79ae09ea0e30660', 'format' : 'iframe', 'height' : 250, 'width' : 300, 'params' : {} };`;
-      const invoke = document.createElement("script");
-      invoke.type = "text/javascript";
-      invoke.src = "//www.highperformanceformat.com/d5b7d02c3eed6fede79ae09ea0e30660/invoke.js";
-      container.appendChild(config);
-      container.appendChild(invoke);
-    }
-  }, []);
-
-  return (
-    <div className="flex flex-col items-center my-6 py-4 border-y border-white/5 bg-zinc-950/40 shadow-inner">
-      <span className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.4em] mb-4">Sponsored Protocol</span>
-      <div ref={adRef} className="rounded-xl overflow-hidden border border-zinc-800 bg-black min-h-[250px] min-w-[300px] flex items-center justify-center shadow-2xl" />
-    </div>
-  );
-});
-AdsterraBanner.displayName = "AdsterraBanner";
+import Link from "next/link";
 
 /* ---------------- COLOR ENGINE ---------------- */
 const getUserColor = (name: string) => {
@@ -69,10 +40,6 @@ export default function GlobalChat() {
       .on("broadcast", { event: "CHAT" }, ({ payload }) => {
         setMessages((m) => {
           const newMessages = [...m, payload];
-          const chatOnly = newMessages.filter(msg => !msg.isAd);
-          if (chatOnly.length > 0 && chatOnly.length % 50 === 0 && !payload.isAd) {
-            newMessages.push({ id: `ad-${Date.now()}`, isAd: true });
-          }
           return newMessages.slice(-100);
         });
       })
@@ -116,8 +83,6 @@ export default function GlobalChat() {
     
     setMessages((m) => {
       const next = [...m, payload];
-      const chatOnly = next.filter(msg => !msg.isAd);
-      if (chatOnly.length % 50 === 0) next.push({ id: `ad-${Date.now()}`, isAd: true });
       return next.slice(-100);
     });
 
@@ -145,7 +110,6 @@ export default function GlobalChat() {
       {/* HEADER */}
       <header className="relative z-10 h-14 border-b border-white/5 bg-black/40 backdrop-blur-md flex items-center justify-between px-6 shrink-0">
         <div className="flex items-center gap-4">
-          {/* BACK TO HOME OPTION */}
           <Link href="/" className="p-2 -ml-2 hover:bg-white/5 rounded-full transition-colors group">
             <ArrowLeft className="w-5 h-5 text-zinc-500 group-hover:text-white transition-colors" />
           </Link>
@@ -165,8 +129,6 @@ export default function GlobalChat() {
         <div className="max-w-[85%] mx-auto space-y-2.5">
           <AnimatePresence initial={false}>
             {messages.map((msg) => {
-              if (msg.isAd) return <AdsterraBanner key={msg.id} />;
-
               const isMe = msg.nickname === nickname;
               const userColor = isMe ? "#a855f7" : getUserColor(msg.nickname);
               const mentionedMe = msg.reply_to?.nickname === nickname;
