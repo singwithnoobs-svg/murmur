@@ -27,9 +27,6 @@ export default function PollsPage() {
   const [isPostingComment, setIsPostingComment] = useState(false);
 
   const [broadcastType, setBroadcastType] = useState<"poll" | "post">("poll");
-  const [hasWatchedAd, setHasWatchedAd] = useState(false);
-  const [adTimer, setAdTimer] = useState(0);
-  const AD_LINK = "https://www.effectivegatecpm.com/ynxwndhjsn?key=feccdd147daef403531a53b803a60d17";
 
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState(["", ""]);
@@ -73,18 +70,16 @@ export default function PollsPage() {
     const interval = setInterval(fetchPolls, 10000);
     return () => clearInterval(interval);
   }, [fetchPolls]);
-const handleLike = async (pollId: string) => {
-    // 1. Optimistic Update (Immediate UI change)
+
+  const handleLike = async (pollId: string) => {
     setPolls(prev => prev.map(p => 
       p.id === pollId ? { ...p, likes: (p.likes || 0) + 1 } : p
     ));
     
-    // 2. Database Update
     const { error } = await supabase.rpc('increment_likes', { row_id: pollId });
     
     if (error) {
       console.error("Like failed:", error);
-      // Revert if database failed
       fetchPolls();
     }
   };
@@ -93,7 +88,6 @@ const handleLike = async (pollId: string) => {
     if (!newComment.trim() || !activePollForComments) return;
     setIsPostingComment(true);
     
-    // 1. Send to Supabase
     const { data, error } = await supabase
       .from("poll_comments")
       .insert([{
@@ -105,40 +99,23 @@ const handleLike = async (pollId: string) => {
 
     if (error) {
       console.error("Comment Error:", error);
-      alert("Failed to transmit comment. Check DB permissions.");
+      alert("Failed to transmit comment.");
     } else {
-      // 2. Success! Clear input and update the modal UI immediately
       const freshComment = data[0];
       
-      // Update the list in the modal without a full refresh
       setActivePollForComments((prev: any) => ({
         ...prev,
         poll_comments: [freshComment, ...(prev.poll_comments || [])]
       }));
       
       setNewComment("");
-      fetchPolls(); // Refresh the main feed count
+      fetchPolls();
     }
     setIsPostingComment(false);
   };
 
-  const triggerAdsterra = () => {
-    window.open(AD_LINK, "_blank");
-    setAdTimer(10);
-    const interval = setInterval(() => {
-      setAdTimer((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          setHasWatchedAd(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
   const createPoll = async () => {
-    if (!hasWatchedAd) return alert("Verify frequency first (Watch Ad)");
+    if (!question.trim()) return alert("Content required");
     setIsSubmitting(true);
     try {
       const expiry = new Date(); 
@@ -157,7 +134,7 @@ const handleLike = async (pollId: string) => {
         const optPayload = options.filter(o => o.trim()).map(text => ({ poll_id: poll.id, option_text: text.trim() }));
         await supabase.from("poll_options").insert(optPayload);
       }
-      setShowCreate(false); setHasWatchedAd(false); setQuestion(""); fetchPolls();
+      setShowCreate(false); setQuestion(""); fetchPolls();
     } catch (err: any) { alert(err.message); } finally { setIsSubmitting(false); }
   };
 
@@ -174,11 +151,9 @@ const handleLike = async (pollId: string) => {
   return (
     <div className="min-h-screen w-full bg-[#030303] text-zinc-100 selection:bg-purple-500/30 font-sans">
       
-      {/* GLOW DECOR */}
       <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-900/20 blur-[120px] pointer-events-none" />
       <div className="fixed bottom-[-10%] right-[-10%] w-[30%] h-[30%] bg-blue-900/10 blur-[120px] pointer-events-none" />
 
-      {/* HEADER */}
       <header className={cn(
         "fixed top-0 left-0 right-0 z-[50] transition-all duration-500 px-6 py-4 flex justify-between items-center",
         scrolled ? "bg-black/60 backdrop-blur-xl border-b border-white/5 py-3" : "bg-transparent"
@@ -197,7 +172,6 @@ const handleLike = async (pollId: string) => {
         </button>
       </header>
 
-      {/* MAIN CONTENT */}
       <main className="max-w-3xl mx-auto px-6 pt-32 pb-32 relative z-10">
         <div className="flex flex-col gap-8">
           {polls.map((poll) => (
@@ -257,7 +231,6 @@ const handleLike = async (pollId: string) => {
                 <div className="h-[1px] bg-gradient-to-r from-transparent via-white/5 to-transparent mb-6" />
               )}
 
-              {/* ACTION ROW */}
               <div className="flex items-center gap-3">
                 <button 
                     onClick={() => handleLike(poll.id)} 
@@ -279,7 +252,6 @@ const handleLike = async (pollId: string) => {
         </div>
       </main>
 
-      {/* COMMENT DRAWER */}
       <AnimatePresence>
         {activePollForComments && (
           <motion.div 
@@ -342,7 +314,6 @@ const handleLike = async (pollId: string) => {
         )}
       </AnimatePresence>
 
-      {/* CREATE BROADCAST MODAL */}
       <AnimatePresence>
         {showCreate && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-2xl flex items-center justify-center p-4">
@@ -387,21 +358,11 @@ const handleLike = async (pollId: string) => {
                        </div>
                    )}
 
-                   <div className="grid grid-cols-2 gap-4">
-                        <button 
-                            onClick={triggerAdsterra} 
-                            disabled={hasWatchedAd}
-                            className={cn(
-                                "py-4 rounded-[1.5rem] border text-[10px] font-black uppercase tracking-widest transition-all",
-                                hasWatchedAd ? "bg-green-500/10 border-green-500/20 text-green-500" : "bg-white/5 border-white/5 text-zinc-500 hover:bg-white/10"
-                            )}
-                        >
-                            {hasWatchedAd ? "Verified" : adTimer > 0 ? `Unlocking... ${adTimer}s` : "Unlock Node"}
-                        </button>
+                   <div className="w-full">
                         <button 
                             onClick={createPoll} 
-                            disabled={!hasWatchedAd || isSubmitting} 
-                            className="py-4 bg-purple-600 rounded-[1.5rem] text-white font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 disabled:opacity-30"
+                            disabled={isSubmitting || !question.trim()} 
+                            className="w-full py-5 bg-purple-600 rounded-[1.5rem] text-white font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 disabled:opacity-30"
                         >
                             {isSubmitting ? "Transmitting..." : "Transmit"}
                         </button>
