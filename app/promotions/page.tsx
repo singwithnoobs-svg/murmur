@@ -1,54 +1,35 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Megaphone, ExternalLink, MessageCircle, Rocket, ChevronDown, ShieldCheck, Cpu, Zap } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ExternalLink, MessageCircle, Rocket, ChevronDown, ShieldCheck, Cpu, Zap } from "lucide-react";
 
 /**
- * AD COMPONENT
- * Improved with cleanup and loading state
+ * MANUAL AD CONFIGURATION
+ * Add your custom image URLs and destination links here
  */
-function AdsterraBanner({ instanceId }: { instanceId: number }) {
-  const adRef = useRef<HTMLDivElement>(null);
+const MANUAL_ADS = [
+  {
+    id: 1,
+    image: "https://via.placeholder.com/300x250/7c3aed/ffffff?text=Sponsor+Alpha", // Replace with your Ad Image URL
+    link: "https://your-link.com",
+    label: "Node 0x7C3A"
+  },
+  {
+    id: 2,
+    image: "https://via.placeholder.com/300x250/4f46e5/ffffff?text=Sponsor+Beta", // Replace with your Ad Image URL
+    link: "https://your-link.com",
+    label: "Node 0x4F46"
+  }
+];
+
+function ManualAdCard({ ad }: { ad: typeof MANUAL_ADS[0] }) {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    if (adRef.current && adRef.current.innerHTML === "") {
-      const adKey = "d5b7d02c3eed6fede79ae09ea0e30660";
-      
-      try {
-        const configScript = document.createElement("script");
-        configScript.innerHTML = `
-          atOptions = {
-            'key' : '${adKey}',
-            'format' : 'iframe',
-            'height' : 250,
-            'width' : 300,
-            'params' : {}
-          };
-        `;
-        
-        const invokeScript = document.createElement("script");
-        invokeScript.src = `https://www.highperformanceformat.com/${adKey}/invoke.js`;
-        invokeScript.async = true;
-        invokeScript.type = "text/javascript";
-        
-        adRef.current.appendChild(configScript);
-        adRef.current.appendChild(invokeScript);
-        
-        // Simulate load completion for UI
-        setTimeout(() => setIsLoaded(true), 1500);
-      } catch (e) {
-        console.error("Adsterra Injection Failed", e);
-      }
-    }
-    
-    // Cleanup function to prevent ghost scripts on unmount
-    return () => {
-      if (adRef.current) adRef.current.innerHTML = "";
-    };
-  }, [instanceId]);
+    const timer = setTimeout(() => setIsLoaded(true), 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div className="relative flex flex-col items-center justify-center w-full py-10 bg-purple-900/[0.03] rounded-[3rem] border border-purple-500/10 min-h-[380px] shadow-2xl transition-all hover:border-purple-500/30">
@@ -62,19 +43,33 @@ function AdsterraBanner({ instanceId }: { instanceId: number }) {
 
       <div className="mb-6 flex items-center gap-2">
         <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-ping" />
-        <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.4em]">Node ID: 0x{instanceId.toString(16).slice(-4)}</span>
+        <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.4em]">{ad.label}</span>
       </div>
 
-      <div ref={adRef} className="rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/5" />
+      <a 
+        href={ad.link} 
+        target="_blank" 
+        rel="noopener noreferrer" 
+        className="block group/ad relative rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/5 transition-transform hover:scale-[1.02]"
+      >
+        <img 
+          src={ad.image} 
+          alt="Sponsor Transmission" 
+          className="w-[300px] h-[250px] object-cover"
+        />
+        <div className="absolute inset-0 bg-purple-600/20 opacity-0 group-hover/ad:opacity-100 transition-opacity flex items-center justify-center">
+            <ExternalLink className="w-8 h-8 text-white drop-shadow-lg" />
+        </div>
+      </a>
       
       <div className="mt-6 flex items-center gap-4">
          <div className="flex items-center gap-1.5">
             <ShieldCheck className="w-3 h-3 text-purple-900" />
-            <span className="text-[8px] font-bold text-zinc-700 uppercase">Encrypted</span>
+            <span className="text-[8px] font-bold text-zinc-700 uppercase">Verified Relay</span>
          </div>
          <div className="flex items-center gap-1.5">
             <Zap className="w-3 h-3 text-purple-900" />
-            <span className="text-[8px] font-bold text-zinc-700 uppercase">High Bandwidth</span>
+            <span className="text-[8px] font-bold text-zinc-700 uppercase">P2P Secure</span>
          </div>
       </div>
     </div>
@@ -82,27 +77,27 @@ function AdsterraBanner({ instanceId }: { instanceId: number }) {
 }
 
 export default function PromotionsPage() {
-  const [visibleAds, setVisibleAds] = useState([1]);
+  // Start by showing only the first ad from our manual list
+  const [visibleCount, setVisibleCount] = useState(1);
   const DISCORD_LINK = "https://discord.gg/E5pGCkSB";
 
   const addNextPromotion = () => {
-    setVisibleAds(prev => [...prev, Date.now()]);
-    // Smooth scroll with a slight delay to allow render
-    setTimeout(() => {
-      window.scrollTo({ 
-        top: document.body.scrollHeight, 
-        behavior: 'smooth' 
-      });
-    }, 100);
+    if (visibleCount < MANUAL_ADS.length) {
+      setVisibleCount(prev => prev + 1);
+      setTimeout(() => {
+        window.scrollTo({ 
+          top: document.body.scrollHeight, 
+          behavior: 'smooth' 
+        });
+      }, 100);
+    }
   };
 
   return (
     <div className="min-h-screen w-full bg-[#030303] text-zinc-100 font-sans overflow-y-auto selection:bg-purple-500/30">
       
-      {/* PURPLE AMBIENT GLOW */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-64 bg-purple-600/10 blur-[120px] pointer-events-none" />
 
-      {/* HEADER SECTION */}
       <header className="max-w-4xl mx-auto px-6 pt-24 pb-12 relative z-10">
         <motion.div 
           initial={{ opacity: 0, y: 20 }} 
@@ -124,43 +119,41 @@ export default function PromotionsPage() {
 
       <main className="max-w-4xl mx-auto px-6 py-12 space-y-16 relative z-10">
         
-        {/* ADS LIST */}
+        {/* MANUAL ADS LIST */}
         <div className="space-y-12">
             <AnimatePresence mode="popLayout">
-            {visibleAds.map((id) => (
+            {MANUAL_ADS.slice(0, visibleCount).map((ad) => (
                 <motion.div
-                key={id}
+                key={ad.id}
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: "spring", damping: 20 }}
                 >
-                <AdsterraBanner instanceId={id} />
+                <ManualAdCard ad={ad} />
                 </motion.div>
             ))}
             </AnimatePresence>
         </div>
 
         {/* SYNC BUTTON */}
-        <div className="py-10 flex flex-col items-center gap-6">
-          <button 
-            onClick={addNextPromotion}
-            className="relative group p-[2px] rounded-full overflow-hidden transition-all active:scale-95"
-          >
-            {/* Animated border */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500 to-transparent group-hover:via-purple-400 animate-[spin_3s_linear_infinite]" />
-            
-            <div className="relative flex flex-col items-center gap-2 bg-black px-12 py-6 rounded-full border border-white/5 transition-colors group-hover:bg-zinc-900">
-                <span className="text-[11px] font-black uppercase tracking-[0.5em] text-purple-500">Sync Next Node</span>
-                <ChevronDown className="w-5 h-5 text-white animate-bounce" />
-            </div>
-          </button>
-        </div>
+        {visibleCount < MANUAL_ADS.length && (
+          <div className="py-10 flex flex-col items-center gap-6">
+            <button 
+              onClick={addNextPromotion}
+              className="relative group p-[2px] rounded-full overflow-hidden transition-all active:scale-95"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500 to-transparent group-hover:via-purple-400 animate-[spin_3s_linear_infinite]" />
+              <div className="relative flex flex-col items-center gap-2 bg-black px-12 py-6 rounded-full border border-white/5 transition-colors group-hover:bg-zinc-900">
+                  <span className="text-[11px] font-black uppercase tracking-[0.5em] text-purple-500">Sync Next Node</span>
+                  <ChevronDown className="w-5 h-5 text-white animate-bounce" />
+              </div>
+            </button>
+          </div>
+        )}
 
         <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-white/5 to-transparent" />
 
-        {/* PROMOTION CTAS */}
         <section className="grid sm:grid-cols-2 gap-8 pb-32">
-          
           <motion.div 
             whileHover={{ y: -8 }}
             className="group bg-zinc-900/20 border border-white/5 rounded-[3.5rem] p-10 flex flex-col justify-between items-start gap-12 hover:border-purple-500/20 transition-all"
