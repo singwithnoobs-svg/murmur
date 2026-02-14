@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, LogOut, RefreshCw, Zap, Loader2, Flag, X, UserX, Reply, CornerDownRight, Terminal } from "lucide-react";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
+import { VoiceRecorder } from "@/components/VoiceRecorder"; // Ensure path is correct
 
 const AdsterraBanner = memo(() => {
   const adRef = useRef<HTMLDivElement>(null);
@@ -62,6 +63,8 @@ function ChatContent() {
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [hasPartnerLeft, setHasPartnerLeft] = useState(false);
+  
+  const isAudioUrl = (url: string) => url.match(/\.(ogg|wav|mp3)/) != null;
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
@@ -190,7 +193,6 @@ function ChatContent() {
   return (
     <div className="flex flex-col h-[100dvh] bg-[#050505] text-zinc-100 overflow-hidden font-sans">
       
-      {/* MODALS REMAIN FIXED */}
       <AnimatePresence>
         {showExitConfirm && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md">
@@ -240,7 +242,6 @@ function ChatContent() {
         )}
       </AnimatePresence>
 
-      {/* FIXED HEADER: Locked at top */}
       <header className="h-20 shrink-0 border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl flex items-center justify-between px-4 md:px-8 z-50">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-purple-600/10 rounded-xl flex items-center justify-center border border-purple-500/20">
@@ -267,11 +268,8 @@ function ChatContent() {
         </div>
       </header>
 
-      {/* SCROLLABLE AREA */}
       <div className="flex-1 overflow-y-auto p-4 md:p-8 no-scrollbar scroll-smooth">
         <div className="max-w-4xl mx-auto space-y-10">
-          
-          {/* Starting Ad */}
           <AdsterraBanner />
 
           <AnimatePresence mode="popLayout">
@@ -302,10 +300,16 @@ function ChatContent() {
                           {msg.reply_metadata.content}
                         </div>
                       )}
-                      {msg.content}
+                      
+                      {isAudioUrl(msg.content) ? (
+                        <audio controls className="h-10 w-48 md:w-64 brightness-90 contrast-125 invert opacity-80">
+                          <source src={msg.content} type="audio/ogg" />
+                        </audio>
+                      ) : (
+                        msg.content
+                      )}
                     </div>
                   </div>
-                  {/* Recurring Ads every 10 messages */}
                   {(i + 1) % 10 === 0 && <AdsterraBanner />}
                 </motion.div>
               );
@@ -315,7 +319,6 @@ function ChatContent() {
         </div>
       </div>
 
-      {/* FIXED INPUT AREA: Locked at bottom */}
       <div className="p-4 md:p-8 bg-zinc-950/80 backdrop-blur-xl border-t border-white/5 shrink-0 z-50">
         <div className="max-w-4xl mx-auto">
           <AnimatePresence>
@@ -348,6 +351,19 @@ function ChatContent() {
               placeholder={partnerNickname ? "Relay message..." : "Syncing node..."}
               className="flex-1 bg-transparent border-none outline-none text-[15px] px-4 py-3 resize-none max-h-40 scrollbar-none placeholder:text-zinc-700"
             />
+            
+            <VoiceRecorder onUploadComplete={async (url) => {
+              if (!roomid || !partnerNickname) return;
+              const messageData = {
+                room_id: roomid,
+                nickname: nickname,
+                content: url,
+                reply_metadata: replyingTo ? { nickname: replyingTo.nickname, content: replyingTo.content } : null
+              };
+              setReplyingTo(null);
+              await supabase.from("messages").insert([messageData]);
+            }} />
+
             <button onClick={sendMessage} disabled={!partnerNickname || !newMessage.trim()} className="p-3.5 bg-white text-black rounded-2xl active:scale-90 disabled:opacity-0 transition-all shadow-xl">
               <Send className="w-5 h-5" />
             </button>
