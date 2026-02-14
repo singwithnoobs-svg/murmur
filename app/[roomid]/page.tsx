@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import { Hash, Send, LogOut, Copy, Check, Flag, X, Terminal, ChevronDown, SmilePlus, Reply, ShieldAlert } from "lucide-react";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
+import { VoiceRecorder } from "@/components/VoiceRecorder";
 
 const AdsterraBanner = memo(() => {
   const adRef = useRef<HTMLDivElement>(null);
@@ -61,7 +62,7 @@ export default function ChatRoom() {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [activeReactionPicker, setActiveReactionPicker] = useState<string | null>(null);
-  const [replyTo, setReplyTo] = useState<any>(null); // NEW: Reply state
+  const [replyTo, setReplyTo] = useState<any>(null);
   
   // Reporting State
   const [showReportModal, setShowReportModal] = useState(false);
@@ -76,6 +77,7 @@ export default function ChatRoom() {
   const channelRef = useRef<any>(null);
 
   const isImageUrl = (url: string) => url.match(/\.(jpeg|jpg|gif|png|webp)$/) != null;
+  const isAudioUrl = (url: string) => url.match(/\.(ogg|wav|mp3)/) != null;
 
   const copyInvite = () => {
     const inviteUrl = `${window.location.origin}/?id=${roomid}`;
@@ -190,10 +192,10 @@ export default function ChatRoom() {
     if (e) e.preventDefault();
     if (!roomid || !newMessage.trim()) return;
     const content = newMessage;
-    const replyData = replyTo ? { nickname: replyTo.nickname, content: replyTo.content } : null; // Quote data
+    const replyData = replyTo ? { nickname: replyTo.nickname, content: replyTo.content } : null; 
     
     setNewMessage(""); 
-    setReplyTo(null); // Reset reply
+    setReplyTo(null); 
     
     if (channelRef.current) channelRef.current.track({ isTyping: false, fp: myFingerprint });
     await supabase.from("messages").insert([{ 
@@ -201,7 +203,7 @@ export default function ChatRoom() {
       nickname, 
       content, 
       reactions: {}, 
-      reply_metadata: replyData // NEW: Store quote
+      reply_metadata: replyData 
     }]);
   };
 
@@ -210,11 +212,10 @@ export default function ChatRoom() {
   return (
     <div className="fixed inset-0 flex flex-col bg-[#050505] text-zinc-100 font-sans overflow-hidden">
       
-      {/* FIXED EXIT UI */}
       <AnimatePresence>
         {showConfirm && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md">
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-zinc-950 border border-white/10 p-8 rounded-[2.5rem] w-full max-w-sm shadow-[0_0_50px_rgba(0,0,0,0.5)] text-center">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-zinc-950 border border-white/10 p-8 rounded-[2.5rem] w-full max-sm shadow-[0_0_50px_rgba(0,0,0,0.5)] text-center">
               <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-red-500/20">
                 <LogOut className="w-8 h-8 text-red-500" />
               </div>
@@ -247,7 +248,6 @@ export default function ChatRoom() {
         )}
       </AnimatePresence>
 
-      {/* HEADER */}
       <header className="h-20 border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl flex items-center justify-between px-4 md:px-8 shrink-0 z-50">
         <div className="flex items-center gap-4 min-w-0">
           <div className="w-10 h-10 bg-purple-600/10 rounded-xl flex items-center justify-center border border-purple-500/20"><Hash className="w-5 h-5 text-purple-400" /></div>
@@ -265,16 +265,15 @@ export default function ChatRoom() {
         </div>
       </header>
 
-      {/* CHAT AREA */}
       <div ref={chatAreaRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 no-scrollbar relative">
         <div className="max-w-4xl mx-auto space-y-10 pb-4">
-          
-          {/* 1. STARTING AD */}
           <AdsterraBanner />
 
           {messages.map((msg, i) => {
             const isMe = msg.nickname === nickname;
             const isImage = isImageUrl(msg.content);
+            const isAudio = isAudioUrl(msg.content);
+
             return (
               <div key={msg.id || i} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
                 <span className="text-[9px] font-black text-zinc-600 mb-2 px-1 uppercase flex items-center gap-2">
@@ -284,7 +283,6 @@ export default function ChatRoom() {
                 <div className="group relative flex items-center gap-2 max-w-[85%]">
                   <div className={`px-6 py-4 rounded-3xl text-[15px] shadow-2xl ${isMe ? "bg-purple-600 text-white rounded-tr-none" : "bg-zinc-900 border border-white/5 rounded-tl-none text-zinc-200"}`}>
                     
-                    {/* QUOTE SECTION */}
                     {msg.reply_metadata && (
                       <div className="mb-2 p-2 rounded-xl bg-black/20 border-l-2 border-white/20 text-[11px] opacity-70 italic truncate">
                         <span className="font-black not-italic text-white/50 uppercase block text-[9px]">@{msg.reply_metadata.nickname}</span>
@@ -292,7 +290,11 @@ export default function ChatRoom() {
                       </div>
                     )}
 
-                    {isImage ? (
+                    {isAudio ? (
+                      <audio controls className="h-10 w-48 md:w-64 brightness-90 contrast-125 invert opacity-80">
+                        <source src={msg.content} type="audio/ogg" />
+                      </audio>
+                    ) : isImage ? (
                       <img src={msg.content} alt="Decrypted Transmission" className="rounded-xl max-h-64 w-full object-cover border border-white/10" />
                     ) : (
                       <div className="whitespace-pre-wrap break-words">{msg.content}</div>
@@ -309,7 +311,6 @@ export default function ChatRoom() {
                     )}
                   </div>
                   
-                  {/* ACTIONS BAR */}
                   <div className={`flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all ${isMe ? "order-first" : ""}`}>
                     <button onClick={() => setReplyTo(msg)} className="p-2 text-zinc-600 hover:text-white"><Reply className="w-4 h-4" /></button>
                     <button onClick={() => setActiveReactionPicker(msg.id)} className="p-2 text-zinc-600 hover:text-purple-400"><SmilePlus className="w-4 h-4" /></button>
@@ -327,7 +328,6 @@ export default function ChatRoom() {
                   </AnimatePresence>
                 </div>
 
-                {/* 2. RECURRING ADS */}
                 {(i + 1) % 10 === 0 && <AdsterraBanner />}
               </div>
             );
@@ -336,7 +336,6 @@ export default function ChatRoom() {
           <div ref={scrollRef} className="h-1" />
         </div>
 
-        {/* JUMP TO BOTTOM */}
         <AnimatePresence>
           {showScrollButton && (
             <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={scrollToBottom} className="fixed bottom-32 left-1/2 -translate-x-1/2 bg-purple-600 p-4 rounded-full shadow-2xl active:scale-90"><ChevronDown className="w-5 h-5" /></motion.button>
@@ -344,10 +343,8 @@ export default function ChatRoom() {
         </AnimatePresence>
       </div>
 
-      {/* INPUT BAR */}
       <div className="p-4 md:p-10 bg-zinc-950/80 backdrop-blur-xl border-t border-white/5 shrink-0">
         <div className="max-w-3xl mx-auto">
-          {/* REPLY PREVIEW */}
           <AnimatePresence>
             {replyTo && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="mb-2 p-3 bg-zinc-900 border border-white/10 rounded-2xl flex items-center justify-between">
@@ -373,6 +370,18 @@ export default function ChatRoom() {
               placeholder="Relay transmission..."
               className="flex-1 bg-transparent border-none outline-none text-[15px] text-zinc-200 py-3 px-4 resize-none no-scrollbar placeholder:text-zinc-700 min-h-[44px] max-h-[200px]"
             />
+            
+            <VoiceRecorder onUploadComplete={async (url) => {
+              await supabase.from("messages").insert([{ 
+                room_id: roomid, 
+                nickname, 
+                content: url, 
+                reactions: {}, 
+                reply_metadata: replyTo ? { nickname: replyTo.nickname, content: replyTo.content } : null 
+              }]);
+              setReplyTo(null);
+            }} />
+
             <button onClick={() => sendMessage()} disabled={!newMessage.trim()} className="p-3.5 bg-white text-black rounded-2xl active:scale-90 transition-all hover:bg-purple-500 hover:text-white mb-1 shrink-0"><Send className="w-5 h-5" /></button>
           </div>
         </div>
