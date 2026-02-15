@@ -3,185 +3,178 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { motion } from "framer-motion";
-import { X, Radio, ShieldAlert } from "lucide-react";
-import FingerprintJS from '@fingerprintjs/fingerprintjs';
+import { motion, AnimatePresence } from "framer-motion";
+import { Zap, Shield, Users, ArrowLeft, Loader2, RefreshCcw } from "lucide-react";
 
-export default function MatchingPage() {
+export default function MatchmakingPage() {
   const router = useRouter();
   const [status, setStatus] = useState("Initializing...");
-  const [isBanned, setIsBanned] = useState(false);
-  const [progress, setProgress] = useState(0);
-  
-  const protocolStarted = useRef(false);
+  const [onlineCount, setOnlineCount] = useState(0);
   const channelRef = useRef<any>(null);
-  const myRecordId = useRef<string | null>(null);
-  const nicknameRef = useRef<string | null>(null);
-  const fallbackInterval = useRef<NodeJS.Timeout | null>(null);
+  const isMatched = useRef(false);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setProgress((prev) => (prev < 95 ? prev + 1 : prev));
-    }, 500);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const init = async () => {
-      const savedName = sessionStorage.getItem("murmur_nickname");
-      if (!savedName) { router.push("/"); return; }
-      
-      nicknameRef.current = savedName;
-      const fpLoad = await FingerprintJS.load();
-      const fp = await fpLoad.get();
-      
-      const banned = await checkBan(fp.visitorId);
-      if (!banned) startMatchmaking(savedName, fp.visitorId);
-    };
-
-    init();
-
-    return () => {
-      if (channelRef.current) supabase.removeChannel(channelRef.current);
-      if (fallbackInterval.current) clearInterval(fallbackInterval.current);
-      if (nicknameRef.current) {
-        supabase.from("matchmaking").delete().eq("nickname", nicknameRef.current).then();
-      }
-    };
-  }, [router]);
-
-  const checkBan = async (fp: string) => {
-    const { data } = await supabase.from("banned_fingerprints")
-      .select("*").eq("fingerprint", fp).maybeSingle();
-    if (data) { setIsBanned(true); return true; }
-    return false;
-  };
-
-  const startMatchmaking = async (name: string, fp: string) => {
-    if (protocolStarted.current) return;
-    protocolStarted.current = true;
-
-    // 1. Clear old ghosts
-    await supabase.from("matchmaking").delete().eq("nickname", name);
-
-    setStatus("Searching for signals...");
-
-    // 2. Look for a Host
-    const { data: host } = await supabase
-      .from("matchmaking")
-      .select("*")
-      .is("room_id", null)
-      .neq("nickname", name)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (host) {
-      // JOINER LOGIC
-      setStatus("Linking Protocol...");
-      const roomId = `room_${Math.random().toString(36).substring(2, 11)}`;
-      
-      await supabase.from("rooms").insert([{ id: roomId }]);
-
-      const { error } = await supabase
-        .from("matchmaking")
-        .update({ room_id: roomId, partner_found: name })
-        .eq("id", host.id);
-
-      if (!error) {
-        router.push(`/random-chat?id=${roomId}`);
-        return;
-      }
-    }
-
-    // 3. Become the HOST
-    setStatus("Broadcasting Signal...");
-    const { data: myNewRecord, error: insertError } = await supabase
-      .from("matchmaking")
-      .insert([{ nickname: name, fingerprint: fp }])
-      .select()
-      .single();
-
-    if (insertError || !myNewRecord) {
-      protocolStarted.current = false;
+    const nickname = sessionStorage.getItem("murmur_nickname");
+    if (!nickname) {
+      router.push("/");
       return;
     }
 
-    myRecordId.current = myNewRecord.id;
+    const startMatchmaking = async () => {
+      const channel = supabase.channel("matchmaking_lobby", {
+        config: { presence: { key: nickname } },
+      });
+      channelRef.current = channel;
 
-    // 4. THE HANDSHAKE (Realtime)
-    channelRef.current = supabase
-      .channel(`match-${myNewRecord.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'matchmaking', filter: `id=eq.${myNewRecord.id}` },
-        (payload) => {
-          if (payload.new.room_id) {
-            handleSuccessfulMatch(payload.new.room_id);
+      channel
+        .on("presence", { event: "sync" }, () => {
+          const state = channel.presenceState();
+          const presences = Object.entries(state).map(([key, val]: any) => ({
+            nickname: key,
+            ...val[0],
+          }));
+
+          setOnlineCount(presences.length);
+          if (!isMatched.current) {
+            findMatch(presences, nickname);
           }
+        })
+        .on("broadcast", { event: "MATCH_PROPOSE" }, ({ payload }) => {
+          if (payload.target === nickname && !isMatched.current) {
+            isMatched.current = true;
+            setStatus("Stranger found! Shaking hands...");
+            
+            channel.send({
+              type: "broadcast",
+              event: "MATCH_ACK",
+              payload: { roomId: payload.roomId, partner: payload.origin }
+            });
+
+            executeMatch(payload.roomId);
+          }
+        })
+        .on("broadcast", { event: "MATCH_ACK" }, ({ payload }) => {
+          if (isMatched.current && payload.partner === nickname) {
+            executeMatch(payload.roomId);
+          }
+        })
+        .subscribe(async (status) => {
+          if (status === "SUBSCRIBED") {
+            setStatus("Searching for peers...");
+            await channel.track({
+              status: "waiting",
+              joined_at: Date.now(),
+            });
+          }
+        });
+    };
+
+    const findMatch = (presences: any[], myName: string) => {
+      const available = presences
+        .filter((p) => p.nickname !== myName && p.status === "waiting")
+        .sort((a, b) => a.joined_at - b.joined_at);
+
+      if (available.length > 0) {
+        const match = available[0];
+        const myData = presences.find(p => p.nickname === myName);
+        
+        if (myData && myData.joined_at > match.joined_at) {
+          initiateHandshake(match.nickname, myName);
         }
-      )
-      .subscribe();
-
-    // 5. THE FALLBACK (If Realtime is disabled or fails)
-    fallbackInterval.current = setInterval(async () => {
-      const { data } = await supabase
-        .from("matchmaking")
-        .select("room_id")
-        .eq("id", myNewRecord.id)
-        .maybeSingle();
-      
-      if (data?.room_id) {
-        handleSuccessfulMatch(data.room_id);
       }
-    }, 2000);
-  };
+    };
 
-  const handleSuccessfulMatch = (roomId: string) => {
-    if (fallbackInterval.current) clearInterval(fallbackInterval.current);
-    setStatus("Signal Locked!");
-    router.push(`/random-chat?id=${roomId}`);
-  };
+    const initiateHandshake = (targetName: string, myName: string) => {
+      isMatched.current = true;
+      const generatedRoomId = `meet_${Math.random().toString(36).slice(2, 11)}`;
+      setStatus("Syncing with node...");
 
-  if (isBanned) return (
-    <div className="h-screen bg-[#020105] text-purple-500 flex flex-col items-center justify-center p-10">
-      <ShieldAlert className="w-16 h-16 mb-4" />
-      <h1 className="font-black uppercase tracking-tighter">System Banned</h1>
-    </div>
-  );
+      channelRef.current.send({
+        type: "broadcast",
+        event: "MATCH_PROPOSE",
+        payload: {
+          origin: myName,
+          target: targetName,
+          roomId: generatedRoomId,
+        },
+      });
+    };
+
+    // --- FIXED FUNCTION ---
+    const executeMatch = (roomId: string) => {
+      setStatus("Connection Secure. Redirecting...");
+      
+      if (channelRef.current) {
+          supabase.removeChannel(channelRef.current);
+      }
+      
+      // We MUST pass the roomId as a query parameter (?id=) 
+      // so the Chat script can read it and stay on the page.
+      setTimeout(() => {
+        router.push(`/random-chat?id=${roomId}`);
+      }, 1000);
+    };
+
+    startMatchmaking();
+
+    return () => {
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
+    };
+  }, [router]);
 
   return (
-    <div className="h-[100dvh] bg-[#020105] text-zinc-100 flex flex-col items-center justify-center p-6 overflow-hidden relative font-sans">
+    <div className="min-h-screen bg-[#05010a] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
       <div className="absolute inset-0 z-0">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-[radial-gradient(circle,rgba(168,85,247,0.15)_0%,transparent_70%)]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-purple-600/5 blur-[120px] rounded-full" />
       </div>
 
-      <div className="relative z-10 w-full max-w-xs flex flex-col items-center">
-        <div className="relative mb-12">
-          <motion.div 
-            animate={{ rotate: 360 }} transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-            className="w-44 h-44 rounded-full border border-purple-500/20 flex items-center justify-center"
-          >
-             <div className="w-36 h-36 rounded-full border-t-2 border-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.3)]" />
-          </motion.div>
-          <Radio className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 text-purple-400 animate-pulse" />
-        </div>
-
-        <div className="text-center w-full space-y-6">
-          <h2 className="text-3xl font-black uppercase italic tracking-tighter text-white">Matching</h2>
-          <p className="text-[11px] font-bold text-purple-400 uppercase tracking-[0.4em]">{status}</p>
-          
-          <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-            <motion.div animate={{ width: `${progress}%` }} className="h-full bg-purple-600 shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
+      <div className="max-w-sm w-full space-y-10 relative z-10 text-center">
+        <div className="relative mx-auto w-32 h-32">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="absolute inset-0 border-t-2 border-purple-500 rounded-full shadow-[0_0_15px_rgba(168,85,247,0.4)]"
+          />
+          <motion.div
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="absolute inset-4 border border-purple-500/20 rounded-full"
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Zap className="w-10 h-10 text-purple-400 fill-purple-400/20" />
           </div>
-
-          <button 
-            onClick={() => router.push("/")}
-            className="mt-8 px-10 py-3 rounded-full bg-white/5 border border-white/10 text-zinc-400 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all"
-          >
-            Abort
-          </button>
         </div>
+
+        <div className="space-y-3">
+          <h2 className="text-2xl font-black uppercase italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-500">
+            {status}
+          </h2>
+          <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-white/5 rounded-full border border-white/5">
+              <Users className="w-3 h-3 text-purple-500" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                {onlineCount} ACTIVE NODES
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white/5 border border-white/5 p-6 rounded-[2rem] backdrop-blur-md">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <Shield className="w-6 h-6 text-purple-500 opacity-50" />
+            <p className="text-[10px] text-zinc-500 font-bold uppercase leading-relaxed tracking-wider">
+              Handshake protocol active. Verifying peer stability before establishing dynamic route.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => router.push("/")}
+          className="group flex items-center justify-center gap-2 text-zinc-600 hover:text-white transition-all text-[10px] font-black uppercase tracking-widest w-full"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> 
+          Abort Sequence
+        </button>
       </div>
     </div>
   );
