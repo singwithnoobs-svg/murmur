@@ -1,201 +1,123 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ExternalLink, MessageCircle, Rocket, ChevronDown, ShieldCheck, Cpu, Zap } from "lucide-react";
-
-/**
- * MANUAL AD CONFIGURATION
- * Add your custom image URLs and destination links here
- */
-const MANUAL_ADS = [
-  {
-    id: 1,
-    image: "https://via.placeholder.com/300x250/7c3aed/ffffff?text=Sponsor+Alpha", // Replace with your Ad Image URL
-    link: "https://your-link.com",
-    label: "Node 0x7C3A"
-  },
-  {
-    id: 2,
-    image: "https://via.placeholder.com/300x250/4f46e5/ffffff?text=Sponsor+Beta", // Replace with your Ad Image URL
-    link: "https://your-link.com",
-    label: "Node 0x4F46"
-  }
-];
-
-function ManualAdCard({ ad }: { ad: typeof MANUAL_ADS[0] }) {
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoaded(true), 800);
-    return () => clearTimeout(timer);
-  }, []);
-
-  return (
-    <div className="relative flex flex-col items-center justify-center w-full py-10 bg-purple-900/[0.03] rounded-[3rem] border border-purple-500/10 min-h-[380px] shadow-2xl transition-all hover:border-purple-500/30">
-      
-      {!isLoaded && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm rounded-[3rem] z-10">
-            <Cpu className="w-8 h-8 text-purple-600 animate-pulse mb-3" />
-            <span className="text-[10px] font-black text-purple-500 uppercase tracking-widest animate-pulse">Scanning Frequencies...</span>
-        </div>
-      )}
-
-      <div className="mb-6 flex items-center gap-2">
-        <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-ping" />
-        <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.4em]">{ad.label}</span>
-      </div>
-
-      <a 
-        href={ad.link} 
-        target="_blank" 
-        rel="noopener noreferrer" 
-        className="block group/ad relative rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/5 transition-transform hover:scale-[1.02]"
-      >
-        <img 
-          src={ad.image} 
-          alt="Sponsor Transmission" 
-          className="w-[300px] h-[250px] object-cover"
-        />
-        <div className="absolute inset-0 bg-purple-600/20 opacity-0 group-hover/ad:opacity-100 transition-opacity flex items-center justify-center">
-            <ExternalLink className="w-8 h-8 text-white drop-shadow-lg" />
-        </div>
-      </a>
-      
-      <div className="mt-6 flex items-center gap-4">
-         <div className="flex items-center gap-1.5">
-            <ShieldCheck className="w-3 h-3 text-purple-900" />
-            <span className="text-[8px] font-bold text-zinc-700 uppercase">Verified Relay</span>
-         </div>
-         <div className="flex items-center gap-1.5">
-            <Zap className="w-3 h-3 text-purple-900" />
-            <span className="text-[8px] font-bold text-zinc-700 uppercase">P2P Secure</span>
-         </div>
-      </div>
-    </div>
-  );
-}
+import { motion } from "framer-motion";
+import { 
+  ExternalLink, 
+  MessageCircle, 
+  Rocket, 
+  ShieldCheck, 
+  Zap, 
+  ArrowLeft, 
+  Home 
+} from "lucide-react";
+import Link from "next/link";
 
 export default function PromotionsPage() {
-  // Start by showing only the first ad from our manual list
-  const [visibleCount, setVisibleCount] = useState(1);
   const DISCORD_LINK = "https://discord.gg/E5pGCkSB";
-
-  const addNextPromotion = () => {
-    if (visibleCount < MANUAL_ADS.length) {
-      setVisibleCount(prev => prev + 1);
-      setTimeout(() => {
-        window.scrollTo({ 
-          top: document.body.scrollHeight, 
-          behavior: 'smooth' 
-        });
-      }, 100);
-    }
-  };
 
   return (
     <div className="min-h-screen w-full bg-[#030303] text-zinc-100 font-sans overflow-y-auto selection:bg-purple-500/30">
       
+      {/* Background Ambient Glow */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-64 bg-purple-600/10 blur-[120px] pointer-events-none" />
 
-      <header className="max-w-4xl mx-auto px-6 pt-24 pb-12 relative z-10">
+      {/* TOP NAVIGATION BAR */}
+      <nav className="fixed top-0 w-full z-[100] px-6 py-6 flex justify-between items-center max-w-4xl left-1/2 -translate-x-1/2">
+        <Link 
+          href="/" 
+          className="group flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-900/50 border border-white/5 backdrop-blur-md hover:border-purple-500/40 transition-all active:scale-95"
+        >
+          <ArrowLeft className="w-4 h-4 text-zinc-400 group-hover:text-purple-400 transition-colors" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 group-hover:text-white">Back</span>
+        </Link>
+
+        <Link 
+          href="/" 
+          className="p-2.5 rounded-xl bg-zinc-900/50 border border-white/5 backdrop-blur-md hover:text-purple-400 transition-all"
+        >
+          <Home className="w-5 h-5" />
+        </Link>
+      </nav>
+
+      <header className="max-w-4xl mx-auto px-6 pt-32 pb-12 relative z-10">
         <motion.div 
           initial={{ opacity: 0, y: 20 }} 
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col items-center text-center gap-4"
         >
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 mb-2">
-            <Zap className="w-3 h-3 text-purple-500" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-purple-400">Verified Sponsor Stream</span>
+            <ShieldCheck className="w-3 h-3 text-purple-500" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-purple-400">Secure Protocol</span>
           </div>
           <h1 className="text-5xl sm:text-7xl font-black italic uppercase tracking-tighter leading-none">
-            Sponsor <span className="text-purple-600">Deck</span>
+            Murmur <span className="text-purple-600">Hub</span>
           </h1>
           <p className="max-w-md text-zinc-500 text-xs font-medium uppercase tracking-[0.2em] leading-relaxed">
-            authorized commercial relay. interactions here directly fuel the development of the Murmurz ecosystem.
+            authorized communication relay. Access community protocols, professional inquiries, and system support.
           </p>
         </motion.div>
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-12 space-y-16 relative z-10">
         
-        {/* MANUAL ADS LIST */}
-        <div className="space-y-12">
-            <AnimatePresence mode="popLayout">
-            {MANUAL_ADS.slice(0, visibleCount).map((ad) => (
-                <motion.div
-                key={ad.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: "spring", damping: 20 }}
-                >
-                <ManualAdCard ad={ad} />
-                </motion.div>
-            ))}
-            </AnimatePresence>
-        </div>
-
-        {/* SYNC BUTTON */}
-        {visibleCount < MANUAL_ADS.length && (
-          <div className="py-10 flex flex-col items-center gap-6">
-            <button 
-              onClick={addNextPromotion}
-              className="relative group p-[2px] rounded-full overflow-hidden transition-all active:scale-95"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500 to-transparent group-hover:via-purple-400 animate-[spin_3s_linear_infinite]" />
-              <div className="relative flex flex-col items-center gap-2 bg-black px-12 py-6 rounded-full border border-white/5 transition-colors group-hover:bg-zinc-900">
-                  <span className="text-[11px] font-black uppercase tracking-[0.5em] text-purple-500">Sync Next Node</span>
-                  <ChevronDown className="w-5 h-5 text-white animate-bounce" />
-              </div>
-            </button>
-          </div>
-        )}
-
-        <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-white/5 to-transparent" />
-
-        <section className="grid sm:grid-cols-2 gap-8 pb-32">
+        {/* GLOBAL COMMAND CENTER - UNIFIED HUB */}
+        <section className="pb-32">
           <motion.div 
-            whileHover={{ y: -8 }}
-            className="group bg-zinc-900/20 border border-white/5 rounded-[3.5rem] p-10 flex flex-col justify-between items-start gap-12 hover:border-purple-500/20 transition-all"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            whileHover={{ y: -5 }}
+            className="group bg-gradient-to-b from-zinc-900/40 to-black border border-white/5 rounded-[4rem] p-8 md:p-16 flex flex-col items-center text-center gap-8 hover:border-purple-500/20 transition-all shadow-2xl relative overflow-hidden"
           >
-            <div className="space-y-6">
-              <div className="w-14 h-14 bg-purple-500/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+            {/* Top Accent Line */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent" />
+            
+            <div className="flex -space-x-3">
+              <div className="w-16 h-16 bg-purple-500/10 rounded-2xl flex items-center justify-center border border-purple-500/20 group-hover:scale-110 group-hover:-rotate-6 transition-all duration-500">
                 <Rocket className="text-purple-500 w-7 h-7" />
               </div>
-              <h4 className="text-3xl font-black uppercase italic tracking-tighter">Careers & <br/>Partners</h4>
-              <p className="text-zinc-500 text-[13px] leading-relaxed">
-                Join our HQ for job applications or branding discussions. All professional inquiries are routed via our <span className="text-purple-400 font-bold">#Support-Tickets</span>.
-              </p>
-            </div>
-            <a 
-              href={DISCORD_LINK}
-              target="_blank"
-              className="w-full py-5 bg-purple-600 text-white rounded-[2rem] text-[11px] font-black uppercase tracking-widest hover:bg-purple-500 transition-all text-center flex items-center justify-center gap-2 shadow-lg shadow-purple-900/20"
-            >
-              Contact Team <ExternalLink className="w-3 h-3" />
-            </a>
-          </motion.div>
-
-          <motion.div 
-            whileHover={{ y: -8 }}
-            className="group bg-zinc-900/20 border border-white/5 rounded-[3.5rem] p-10 flex flex-col justify-between items-start gap-12 hover:border-[#5865F2]/20 transition-all"
-          >
-            <div className="space-y-6">
-              <div className="w-14 h-14 bg-[#5865F2]/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="w-16 h-16 bg-[#5865F2]/10 rounded-2xl flex items-center justify-center border border-[#5865F2]/20 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
                 <MessageCircle className="text-[#5865F2] w-7 h-7" />
               </div>
-              <h4 className="text-3xl font-black uppercase italic tracking-tighter">Enter the <br/>Community</h4>
-              <p className="text-zinc-500 text-[13px] leading-relaxed">
-                Connect with the Murmurz elite. Get direct access to beta protocols, dev-logs, and global live-chats.
+            </div>
+
+            <div className="max-w-xl space-y-4">
+              <h4 className="text-4xl md:text-6xl font-black uppercase italic tracking-tighter leading-none">
+                Global <span className="text-purple-600">Command</span> Center
+              </h4>
+              <p className="text-zinc-500 text-sm md:text-base font-medium leading-relaxed max-w-md mx-auto">
+                Discord is our primary frequency. Connect here for <span className="text-white">Community Access</span>, 
+                professional <span className="text-white">Partnerships</span>, <span className="text-white">Careers</span>, 
+                and <span className="text-white">Official Support</span> tickets.
               </p>
             </div>
+
+            {/* Hub Categories */}
+            <div className="flex flex-wrap justify-center gap-2 md:gap-3">
+              {["Community", "Support", "Partnerships", "Sponsorships", "Careers"].map((tag) => (
+                <span key={tag} className="px-4 py-2 rounded-xl border border-white/5 bg-zinc-900/50 text-[10px] font-black uppercase tracking-widest text-zinc-400 group-hover:text-purple-400 group-hover:border-purple-500/20 transition-colors">
+                  {tag}
+                </span>
+              ))}
+            </div>
+
             <a 
               href={DISCORD_LINK}
               target="_blank"
-              className="w-full py-5 bg-[#5865F2] text-white rounded-[2rem] text-[11px] font-black uppercase tracking-widest hover:opacity-90 transition-all text-center flex items-center justify-center gap-3 shadow-lg shadow-blue-900/20"
+              rel="noopener noreferrer"
+              className="group/btn relative w-full max-w-sm py-6 bg-white text-black rounded-[2.5rem] text-[12px] font-black uppercase tracking-[0.3em] hover:bg-purple-600 hover:text-white transition-all duration-500 text-center flex items-center justify-center gap-3 shadow-xl overflow-hidden"
             >
-              Access Hub <ExternalLink className="w-3 h-3" />
+              <span className="relative z-10 flex items-center gap-2">
+                Initialize Connection <ExternalLink className="w-4 h-4" />
+              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-indigo-600 opacity-0 group-hover/btn:opacity-100 transition-opacity duration-500" />
             </a>
+            
+            <div className="flex items-center gap-2 opacity-50">
+              <Zap className="w-3 h-3 text-purple-500" />
+              <p className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.5em]">
+                Authorized HQ Relay
+              </p>
+            </div>
           </motion.div>
         </section>
       </main>
@@ -205,7 +127,6 @@ export default function PromotionsPage() {
         ::-webkit-scrollbar-track { background: #030303; }
         ::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #7c3aed; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
     </div>
   );
