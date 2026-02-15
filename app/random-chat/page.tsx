@@ -203,23 +203,51 @@ function ChatContent() {
         )}
       </AnimatePresence>
 
-      <header className="h-24 shrink-0 border-b border-purple-500/10 bg-zinc-950/80 backdrop-blur-xl flex items-center justify-between px-6 md:px-12 z-50">
-        <div className="flex items-center gap-5">
-          <Hash className="w-6 h-6 text-purple-400" />
-          <div>
-            <h2 className="font-black text-lg uppercase italic tracking-tight text-white">{partnerNickname || "Connecting..."}</h2>
-            <span className="text-[10px] text-green-500 font-black uppercase flex items-center gap-2">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> Live Node
-            </span>
-          </div>
-        </div>
+     <header className="h-20 shrink-0 border-b border-purple-500/10 bg-black/40 backdrop-blur-md flex items-center justify-between px-5 z-50">
+  <div className="flex items-center gap-3 min-w-0">
+    <div className="w-11 h-11 bg-purple-600/20 rounded-xl flex items-center justify-center border border-purple-500/20 shrink-0">
+      <Hash className="w-5 h-5 text-purple-400" />
+    </div>
+    <div className="truncate">
+      <h2 className="font-black text-sm uppercase italic tracking-tight text-white truncate">
+        {partnerNickname || "Connecting..."}
+      </h2>
+      <span className="text-[10px] text-green-500 font-bold uppercase flex items-center gap-1.5 tracking-widest">
+        <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" /> 
+        Live Node
+      </span>
+    </div>
+  </div>
 
-        <div className="flex items-center gap-3">
-          <button onClick={() => setShowReportModal(true)} className="h-12 w-12 flex items-center justify-center rounded-2xl border border-white/5 text-zinc-600 hover:text-red-500 transition-all"><Flag className="w-5 h-5" /></button>
-          <button onClick={handleSkip} className="flex items-center gap-3 h-12 px-6 rounded-2xl bg-white text-black font-black text-xs uppercase active:scale-95 transition-all"><RefreshCw className="w-4 h-4" /> SKIP</button>
-          <button onClick={() => setShowExitConfirm(true)} className="h-12 w-12 flex items-center justify-center rounded-2xl border border-white/5 text-zinc-500 hover:bg-zinc-900 transition-all"><LogOut className="w-5 h-5" /></button>
-        </div>
-      </header>
+  <div className="flex items-center gap-2">
+    {/* REPORT BUTTON */}
+    <button 
+      onClick={() => setShowReportModal(true)} 
+      className="h-11 w-11 flex items-center justify-center rounded-2xl border border-white/5 bg-zinc-900/50 text-zinc-400 hover:text-red-500 active:scale-90 transition-all"
+      title="Report Peer"
+    >
+      <Flag className="w-5 h-5" />
+    </button>
+
+    {/* SKIP/RELOAD BUTTON (Replaces text button) */}
+    <button 
+      onClick={handleSkip} 
+      className="h-11 w-11 flex items-center justify-center rounded-2xl border border-purple-500/30 bg-purple-600/10 text-purple-400 hover:bg-purple-600 hover:text-white active:scale-90 transition-all"
+      title="Next Peer"
+    >
+      <RefreshCw className="w-5 h-5" />
+    </button>
+
+    {/* EXIT BUTTON */}
+    <button 
+      onClick={() => setShowExitConfirm(true)} 
+      className="h-11 w-11 flex items-center justify-center rounded-2xl border border-white/5 bg-zinc-900/50 text-zinc-400 hover:text-purple-400 active:scale-90 transition-all"
+      title="Exit Chat"
+    >
+      <LogOut className="w-5 h-5" />
+    </button>
+  </div>
+</header>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-8 no-scrollbar scroll-smooth">
         <div className="max-w-5xl mx-auto space-y-2">
