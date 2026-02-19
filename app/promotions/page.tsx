@@ -65,7 +65,6 @@ export default function PromotionsPage() {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            whileHover={{ y: -5 }}
             className="group bg-gradient-to-b from-zinc-900/40 to-black border border-white/5 rounded-[4rem] p-8 md:p-16 flex flex-col items-center text-center gap-8 hover:border-purple-500/20 transition-all shadow-2xl relative overflow-hidden"
           >
             {/* Top Accent Line */}
@@ -104,12 +103,12 @@ export default function PromotionsPage() {
               href={DISCORD_LINK}
               target="_blank"
               rel="noopener noreferrer"
-              className="group/btn relative w-full max-w-sm py-6 bg-white text-black rounded-[2.5rem] text-[12px] font-black uppercase tracking-[0.3em] hover:bg-purple-600 hover:text-white transition-all duration-500 text-center flex items-center justify-center gap-3 shadow-xl overflow-hidden"
+              className="group/btn relative w-full max-w-sm py-6 bg-purple-600 text-white rounded-[2.5rem] text-[12px] font-black uppercase tracking-[0.3em] hover:bg-purple-600 hover:text-white transition-all duration-500 text-center flex items-center justify-center gap-3 shadow-xl overflow-hidden"
             >
               <span className="relative z-10 flex items-center gap-2">
                 Initialize Connection <ExternalLink className="w-4 h-4" />
               </span>
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-indigo-600 opacity-0 group-hover/btn:opacity-100 transition-opacity duration-500" />
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-indigo-600 opacity-0 transition-opacity duration-500" />
             </a>
             
             <div className="flex items-center gap-2 opacity-50">
