@@ -13,7 +13,7 @@ import {
 import Link from "next/link";
 
 export default function PromotionsPage() {
-  const DISCORD_LINK = "https://discord.gg/E5pGCkSB";
+  const DISCORD_LINK = "https://discord.gg/RUYz55X4";
 
   return (
     <div className="min-h-screen w-full bg-[#030303] text-zinc-100 font-sans overflow-y-auto selection:bg-purple-500/30">
