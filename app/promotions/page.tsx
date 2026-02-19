@@ -31,12 +31,6 @@ export default function PromotionsPage() {
           <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 group-hover:text-white">Back</span>
         </Link>
 
-        <Link 
-          href="/" 
-          className="p-2.5 rounded-xl bg-zinc-900/50 border border-white/5 backdrop-blur-md hover:text-purple-400 transition-all"
-        >
-          <Home className="w-5 h-5" />
-        </Link>
       </nav>
 
       <header className="max-w-4xl mx-auto px-6 pt-32 pb-12 relative z-10">
