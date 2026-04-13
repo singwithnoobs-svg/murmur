@@ -2,64 +2,192 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------- ROOT DESIGN TOKENS ---------------- */
+
 :root {
-  --background: #09090b; /* Slightly deeper black for OLED mobile screens */
-  --foreground: #ffffff;
+  --bg-primary: #05010a;
+  --bg-secondary: #09090b;
+  --bg-tertiary: #111113;
+
+  --text-primary: #ffffff;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+
+  --accent: #a855f7;
+  --accent-strong: #c084fc;
+  --accent-glow: rgba(168, 85, 247, 0.4);
+
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.15);
+
+  --radius-lg: 1.5rem;
+  --radius-xl: 2rem;
 }
+
+/* ---------------- BASE ---------------- */
 
 @layer base {
   html {
-    /* Allow the page to grow naturally */
     height: auto;
     min-height: 100%;
-    /* Keep it dark */
-    background-color: var(--background);
+    background-color: var(--bg-primary);
+    scroll-behavior: smooth;
   }
 
   body {
-    /* REMOVED: height: 100dvh and overflow: hidden */
     min-height: 100vh;
     width: 100vw;
-    /* Allows scrolling to happen */
-    overflow-y: auto; 
+
+    overflow-y: auto;
     overflow-x: hidden;
-    
-    /* Keeps your bounce prevention but only for horizontal */
+
     overscroll-behavior-x: none;
-    
-    /* Keeps your mobile polish */
+
     -webkit-tap-highlight-color: transparent;
-    background-color: var(--background);
-    color: var(--foreground);
+
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
   }
 }
 
-body {
-  /* Smoother, more modern radial glow */
-  background: radial-gradient(circle at 50% -20%, #1e1e2e 0%, #09090b 80%);
+/* ---------------- BACKGROUND SYSTEM ---------------- */
+
+/* layered aurora + radial depth */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(168, 85, 247, 0.12), transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(217, 70, 239, 0.12), transparent 40%);
+  z-index: -2;
+  filter: blur(60px);
 }
 
-/* Glassmorphism Evolution */
+/* subtle grid texture */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+  z-index: -1;
+  opacity: 0.2;
+}
+
+/* ---------------- GLASSMORPHISM (UPGRADED) ---------------- */
+
 .glass-card {
-  background: rgba(24, 24, 27, 0.6);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  background: rgba(20, 20, 25, 0.55);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-/* Updated Matching Animation */
-@keyframes pulse-blue {
-  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
-  70% { box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+/* hover lift */
+.glass-hover {
+  transition: all 0.3s ease;
 }
 
-.matching-active {
-  animation: pulse-blue 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+.glass-hover:hover {
+  transform: translateY(-4px) scale(1.01);
+  border-color: var(--border-strong);
 }
 
-/* Hide scrollbars for a clean app-like feel while keeping scroll functionality */
+/* ---------------- BUTTON SYSTEM ---------------- */
+
+.btn-primary {
+  @apply px-6 py-3 rounded-full font-bold transition-all;
+  background: linear-gradient(135deg, #a855f7, #d946ef);
+  box-shadow: 0 0 30px rgba(168, 85, 247, 0.3);
+}
+
+.btn-primary:hover {
+  transform: scale(1.03);
+  box-shadow: 0 0 60px rgba(168, 85, 247, 0.5);
+}
+
+.btn-secondary {
+  @apply px-6 py-3 rounded-full border transition-all;
+  border-color: var(--border-subtle);
+}
+
+.btn-secondary:hover {
+  border-color: var(--border-strong);
+  background: rgba(255,255,255,0.05);
+}
+
+/* ---------------- INPUT SYSTEM ---------------- */
+
+.input-modern {
+  @apply w-full px-5 py-4 rounded-xl outline-none transition-all;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-subtle);
+}
+
+.input-modern:focus {
+  border-color: var(--accent);
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
+}
+
+/* ---------------- ANIMATIONS ---------------- */
+
+/* subtle float */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* glow pulse */
+@keyframes glow {
+  0% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  70% { box-shadow: 0 0 0 20px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.animate-glow {
+  animation: glow 2s infinite;
+}
+
+/* shimmer effect */
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    120deg,
+    transparent,
+    rgba(255,255,255,0.2),
+    transparent
+  );
+  animation: shimmer 2s infinite;
+}
+
+/* ---------------- SCROLL ---------------- */
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -68,7 +196,15 @@ body {
   scrollbar-width: none;
 }
 
-/* Utility for the Input area to stay above the mobile keyboard */
+/* ---------------- MOBILE SAFE ---------------- */
+
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ---------------- SELECTION ---------------- */
+
+::selection {
+  background: rgba(168, 85, 247, 0.4);
+  color: white;
 }
