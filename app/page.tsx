@@ -2,157 +2,240 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { RefreshCw, Hash, Users, MessageSquare, Globe, X, Megaphone, Zap, ShieldCheck } from "lucide-react";
+import {
+  RefreshCw, ShieldCheck, Zap, Megaphone, Users, Key
+} from "lucide-react";
 import Navbar from "@/components/Navbar";
+import { supabase } from "@/lib/supabase";
 
-// Simplified Name Library
-const prefixes = ["Neo", "Vox", "Zen", "Lux", "Nyx", "Sol", "Axe", "Bio", "Sky", "Net"];
-const cores = ["Bit", "Vex", "Max", "Dot", "Ace", "Hub", "Zip", "Ray", "Mod", "Key"];
-const suffixes = ["1", "X", "0", "Z", "V", "9", "A", "M", "Q", "P"];
+/* ---------------- NAME GENERATOR ---------------- */
+
+const prefixes = ["Neo", "Vox", "Zen", "Lux", "Nyx", "Sol"];
+const cores = ["Bit", "Vex", "Max", "Dot", "Ace", "Hub"];
+const suffixes = ["1", "X", "0", "Z", "V"];
 
 export default function LandingPage() {
   const [name, setName] = useState("");
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [userCount, setUserCount] = useState<number>(0);
+
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  /* ---------------- GENERATE NAME ---------------- */
+
   const generateIdentity = () => {
-    const p = prefixes[Math.floor(Math.random() * prefixes.length)];
-    const c = cores[Math.floor(Math.random() * cores.length)];
-    const s = suffixes[Math.floor(Math.random() * suffixes.length)];
-    const identity = `${p}${c}${s}`; // Shorter, cleaner names
+    const identity =
+      prefixes[Math.floor(Math.random() * prefixes.length)] +
+      cores[Math.floor(Math.random() * cores.length)] +
+      suffixes[Math.floor(Math.random() * suffixes.length)];
+
     setName(identity);
     sessionStorage.setItem("murmur_nickname", identity);
     return identity;
   };
 
-  useEffect(() => { 
-    const currentName = generateIdentity(); 
-    const inviteId = searchParams.get("id");
-    if (inviteId) {
-      sessionStorage.setItem("murmur_nickname", currentName);
-      router.push(`/lobby?id=${inviteId}`);
-    }
-  }, [searchParams, router]);
+  /* ---------------- FETCH USER COUNT ---------------- */
 
-  const handleProtocolSelection = (path: string) => {
-    sessionStorage.setItem("murmur_nickname", name);
-    const inviteId = searchParams.get("id");
-    if (inviteId && path === "/lobby") {
-      router.push(`/lobby?id=${inviteId}`);
-    } else {
-      router.push(path);
+  useEffect(() => {
+  const fetchCount = async () => {
+    console.log("📡 Fetching user count...");
+
+    const { data, error } = await supabase
+      .from("stats")
+      .select("total_users")
+      .eq("id", 1)
+      .single();
+
+    if (error) {
+      console.error("❌ Fetch error:", error);
+      return;
     }
+
+    console.log("✅ Fetched count:", data);
+
+    if (data) setUserCount(data.total_users);
   };
 
-  const menuOptions = [
-    { name: "Random Chat", icon: <Hash className="w-5 h-5" />, path: "/matching", desc: "Instant Match" },
-    { name: "Private Chat", icon: <Users className="w-5 h-5" />, path: "/lobby", desc: "Via Invite Link" },
-    { name: "Global Rooms", icon: <Globe className="w-5 h-5" />, path: "/livechat", desc: "Public Stream" },
-    { name: "Polls", icon: <MessageSquare className="w-5 h-5" />, path: "/polls", desc: "Discussions" },
-  ];
+  fetchCount();
+}, []);
+
+  /* ---------------- INIT ---------------- */
+
+  useEffect(() => {
+    const id = generateIdentity();
+    const inviteId = searchParams.get("id");
+
+    if (inviteId) {
+      sessionStorage.setItem("murmur_nickname", id);
+      router.push(`/lobby?id=${inviteId}`);
+    }
+  }, []);
+
+  /* ---------------- INCREMENT COUNT ---------------- */
+
+  const incrementUserCount = async () => {
+  console.log("🚀 Increment triggered");
+
+  if (sessionStorage.getItem("counted")) {
+    console.log("⚠️ Already counted in this session");
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("stats")
+    .select("total_users")
+    .eq("id", 1)
+    .single();
+
+  if (error) {
+    console.error("❌ Fetch before increment failed:", error);
+    return;
+  }
+
+  console.log("📊 Current count:", data.total_users);
+
+  const newCount = data.total_users + 1;
+
+  const { error: updateError } = await supabase
+    .from("stats")
+    .update({ total_users: newCount })
+    .eq("id", 1);
+
+  if (updateError) {
+    console.error("❌ Update failed:", updateError);
+    return;
+  }
+
+  console.log("✅ Updated count to:", newCount);
+
+  setUserCount(newCount);
+  sessionStorage.setItem("counted", "true");
+};
+
+  /* ---------------- START CHAT ---------------- */
+
+ const startChat = async () => {
+  console.log("🟢 Start Chat clicked");
+
+  await incrementUserCount();
+
+  sessionStorage.setItem("murmur_nickname", name);
+  const inviteId = searchParams.get("id");
+
+  console.log("➡️ Redirecting...");
+
+  router.push(inviteId ? `/lobby?id=${inviteId}` : "/lobby");
+};
+
+  /* ---------------- UI ---------------- */
 
   return (
-    <div className="min-h-screen w-full bg-[#05010a] text-zinc-100 flex flex-col relative font-sans">
-      
-      {/* STATIC DEEP PURPLE BACKGROUND (NO ANIMATION) */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-[80%] bg-[radial-gradient(circle,rgba(88,28,135,0.08)_0%,transparent_70%)]" />
+    <div className="min-h-screen bg-[#05010a] text-white relative overflow-hidden">
+
+      {/* 🌌 BACKGROUND */}
+      <div className="absolute inset-0">
+        <div className="absolute w-[600px] h-[600px] bg-purple-600/20 blur-[140px] top-[-200px] left-[-200px]" />
+        <div className="absolute w-[500px] h-[500px] bg-fuchsia-500/20 blur-[140px] bottom-[-200px] right-[-200px]" />
       </div>
 
       <Navbar />
 
-      <main className="flex-1 flex items-center justify-center px-6 py-12 relative z-10">
-        <div className="max-w-md w-full mx-auto text-center space-y-8">
-          
-          <div className="space-y-3">
-            <div className="flex items-center justify-center gap-2">
-                <ShieldCheck className="w-3 h-3 text-purple-500" />
-                <p className="text-purple-400/60 font-black uppercase tracking-[0.4em] text-[8px]">
-                    Encrypted Protocol Active
-                </p>
-            </div>
-            {searchParams.get("id") && (
-              <div className="inline-block px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[9px] font-black uppercase tracking-widest">
-                Invited to Room: {searchParams.get("id")}
-              </div>
-            )}
+      <main className="relative z-10 px-6 py-20 max-w-5xl mx-auto text-center">
+
+        {/* HERO */}
+        <div className="space-y-6">
+          <h1 className="text-6xl font-black tracking-tight">
+            Murmurz
+          </h1>
+
+          <p className="text-zinc-400 max-w-md mx-auto">
+            Chat anonymously with strangers or friends.
+            No accounts. No tracking. Just instant communication.
+          </p>
+
+          {/* TRUST BAR */}
+          <div className="flex justify-center gap-6 text-xs text-zinc-500 mt-4">
+            <span>🔒 No Login</span>
+            <span>⚡ Instant</span>
+            <span>🌍 Global</span>
           </div>
 
-          {/* IDENTITY CARD (COMPACT) */}
-          <div className="bg-zinc-900/40 border border-white/5 p-6 rounded-[2rem] backdrop-blur-md shadow-2xl">
-            <div className="flex items-center justify-between gap-4 bg-black/40 border border-purple-500/10 p-4 rounded-2xl">
-              <div className="flex flex-col text-left">
-                <span className="text-3xl font-black tracking-tight text-white uppercase italic">
-                  {name}
-                </span>
-                <span className="text-[8px] text-purple-500 uppercase font-black tracking-widest mt-1">
-                    Temporary Node
-                </span>
-              </div>
-              <button
-                onClick={generateIdentity}
-                className="p-3 bg-purple-500/10 hover:bg-purple-500 text-purple-400 hover:text-white rounded-xl transition-all border border-purple-500/20"
-              >
-                <RefreshCw className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-col items-center gap-6">
-            {/* PURPLE START BUTTON (SMALLER) */}
-            <button
-              onClick={() => setIsMenuOpen(true)}
-              className="w-full py-6 rounded-[1.8rem] bg-purple-600 hover:bg-purple-500 text-white font-black text-xl uppercase tracking-[0.3em] transition-all shadow-[0_10px_40px_rgba(147,51,234,0.3)] flex items-center justify-center gap-3"
-            >
-              <Zap className="w-5 h-5 fill-white" />
-              Join Chat
-            </button>
-
-            <button
-              onClick={() => router.push('/promotions')}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-white/5 border border-white/5 text-zinc-500 font-black text-[9px] uppercase tracking-widest hover:text-purple-400 transition-all"
-            >
-              <Megaphone className="w-3 h-3" /> Support
-            </button>
+          {/* USER COUNT */}
+          <div className="mt-6 text-sm text-zinc-400">
+            Trusted by{" "}
+            <span className="text-purple-400 font-bold text-lg">
+              {userCount.toLocaleString()}
+            </span>{" "}
+            users
           </div>
         </div>
+
+        {/* IDENTITY CARD */}
+        <div className="mt-16 max-w-md mx-auto p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl">
+
+          <div className="flex items-center justify-between">
+            <div className="text-left">
+              <h2 className="text-2xl font-black">{name}</h2>
+              <p className="text-xs text-purple-400 uppercase tracking-widest">
+                Temporary Identity
+              </p>
+            </div>
+
+            <button
+              onClick={generateIdentity}
+              className="p-3 rounded-xl bg-white/5 hover:bg-purple-500/20 transition"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+
+        </div>
+
+        {/* CTA */}
+        <button
+          onClick={startChat}
+          className="mt-8 px-10 py-5 rounded-2xl font-bold text-lg
+          bg-gradient-to-r from-purple-600 to-fuchsia-600
+          hover:scale-105 transition-all"
+        >
+          <span className="flex items-center gap-2 justify-center">
+            <Zap className="w-5 h-5" />
+            Start Chatting
+          </span>
+        </button>
+
+        {/* FEATURES */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-20">
+
+          <Feature icon={<ShieldCheck />} title="Anonymous" desc="No identity needed" />
+          <Feature icon={<Users />} title="Public Rooms" desc="Chat globally" />
+          <Feature icon={<Key />} title="Private Chat" desc="Password rooms" />
+          <Feature icon={<Zap />} title="Instant" desc="Real-time messages" />
+
+        </div>
+
+        {/* SUPPORT */}
+        <button
+          onClick={() => router.push("/promotions")}
+          className="mt-16 text-xs text-zinc-500 hover:text-purple-400 flex items-center gap-2 mx-auto"
+        >
+          <Megaphone className="w-3 h-3" />
+          Support Murmurz
+        </button>
+
       </main>
+    </div>
+  );
+}
 
-      {/* MENU MODAL (INSTANT LOAD) */}
-      {isMenuOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
-          <div className="bg-[#0a0a0f] border border-white/10 w-full max-w-sm rounded-[2.5rem] overflow-hidden shadow-3xl">
-            <div className="p-6 border-b border-white/5 flex justify-between items-center">
-              <h3 className="text-lg font-black uppercase tracking-widest italic text-white">Protocols</h3>
-              <button 
-                onClick={() => setIsMenuOpen(false)}
-                className="p-2 hover:bg-white/5 rounded-full text-zinc-500"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+/* ---------------- FEATURE CARD ---------------- */
 
-            <div className="p-4 grid gap-3">
-              {menuOptions.map((opt) => (
-                <button
-                  key={opt.name}
-                  onClick={() => handleProtocolSelection(opt.path)}
-                  className="flex items-center gap-4 p-4 rounded-2xl bg-zinc-900/50 hover:bg-purple-600 text-white group transition-all text-left border border-white/5"
-                >
-                  <div className="w-10 h-10 shrink-0 rounded-xl bg-purple-500/10 flex items-center justify-center group-hover:bg-white group-hover:text-purple-600">
-                    {opt.icon}
-                  </div>
-                  <div>
-                    <div className="font-black uppercase text-[12px] tracking-widest">{opt.name}</div>
-                    <div className="text-[9px] text-zinc-500 group-hover:text-white/80 font-bold uppercase">{opt.desc}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+function Feature({ icon, title, desc }: any) {
+  return (
+    <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+      <div className="text-purple-400 mb-2 flex justify-center">{icon}</div>
+      <h3 className="text-sm font-bold">{title}</h3>
+      <p className="text-xs text-zinc-400">{desc}</p>
     </div>
   );
 }
