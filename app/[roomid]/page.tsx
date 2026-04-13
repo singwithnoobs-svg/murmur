@@ -4,10 +4,12 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
-import { Hash, Send, LogOut, Copy, Check, Flag, X, Terminal, ChevronDown, SmilePlus, Reply } from "lucide-react";
+import { 
+  Hash, Send, LogOut, Copy, Check, Flag, X, 
+  Terminal, ChevronDown, SmilePlus, Reply, Share2 
+} from "lucide-react";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import { VoiceRecorder } from "@/components/VoiceRecorder";
-import { Share2 } from "lucide-react";
 
 export default function ChatRoom() {
   const params = useParams();
@@ -39,8 +41,14 @@ export default function ChatRoom() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const channelRef = useRef<any>(null);
 
-  const isImageUrl = (url: string) => url.match(/\.(jpeg|jpg|gif|png|webp)$/) != null;
   const isAudioUrl = (url: string) => url.match(/\.(ogg|wav|mp3)/) != null;
+  const getFileNameFromUrl = (url: string) => {
+    try {
+      return new URL(url).pathname.split("/chat-images/")[1];
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
     const savedName = sessionStorage.getItem("murmur_nickname");
@@ -116,29 +124,51 @@ export default function ChatRoom() {
 
   useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, typingUsers]);
 
-const handleShare = async () => {
-  const shareUrl = `${window.location.origin}/?id=${roomid}`;
-  
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title: 'Join Murmur Node',
-        text: `Secure connection requested. Join my room:`,
-        url: shareUrl,
-      });
-    } catch (err) {
-      console.log("Share failed:", err);
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const now = Date.now();
+      for (const msg of messages) {
+        if (!msg.is_image) continue;
+        const created = new Date(msg.created_at).getTime();
+        if (created >= now - 30000) continue;
+        if (msg._deleting) continue;
+        msg._deleting = true;
+        try {
+          const fileName = getFileNameFromUrl(msg.content);
+          if (fileName) {
+            await supabase.storage.from("chat-images").remove([fileName]);
+          }
+          await supabase.from("messages").delete().eq("id", msg.id);
+        } catch (err) {
+          console.error("DELETE ERROR:", err);
+        }
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [messages]);
+
+  const handleShare = async () => {
+    const shareUrl = `${window.location.origin}/?id=${roomid}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Join Murmur Node',
+          text: `Secure connection requested. Join my room:`,
+          url: shareUrl,
+        });
+      } catch (err) {
+        console.log("Share failed:", err);
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        console.error('Failed to copy:', err);
+      }
     }
-  } else {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  }
-};
+  };
 
   return (
     <div className="fixed inset-0 flex flex-col bg-[#050507] text-zinc-100 overflow-hidden font-sans">
@@ -186,28 +216,18 @@ const handleShare = async () => {
             <span className="flex items-center gap-1.5 text-[10px] text-green-500 font-bold uppercase tracking-widest"><span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" /> {onlineCount} Nodes</span>
           </div>
         </div>
-       <div className="flex items-center gap-2">
-  <button onClick={() => setShowReportModal(true)} className="h-12 w-12 flex items-center justify-center rounded-2xl border border-white/5 bg-zinc-900/50 text-zinc-400 hover:text-red-500 active:scale-90 transition-all">
-    <Flag className="w-6 h-6" />
-  </button>
-  
-  <button onClick={() => setShowConfirm(true)} className="h-12 w-12 flex items-center justify-center rounded-2xl border border-white/5 bg-zinc-900/50 text-zinc-400 hover:text-purple-400 active:scale-90 transition-all">
-    <LogOut className="w-6 h-6" />
-  </button>
-
-  {/* NEW INVITE/SHARE BUTTON */}
-  <button 
-    onClick={handleShare} 
-    className="h-12 px-4 rounded-2xl border border-purple-500/30 bg-purple-600/10 flex items-center gap-2 text-xs font-black uppercase text-purple-400 active:scale-95 transition-all"
-  >
-    {copied ? (
-      <Check className="w-4 h-4 text-green-500" />
-    ) : (
-      <Share2 className="w-4 h-4" /> 
-    )} 
-    <span className="hidden sm:inline">{copied ? "Copied" : "Invite"}</span>
-  </button>
-</div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowReportModal(true)} className="h-12 w-12 flex items-center justify-center rounded-2xl border border-white/5 bg-zinc-900/50 text-zinc-400 hover:text-red-500 active:scale-90 transition-all">
+            <Flag className="w-6 h-6" />
+          </button>
+          <button onClick={() => setShowConfirm(true)} className="h-12 w-12 flex items-center justify-center rounded-2xl border border-white/5 bg-zinc-900/50 text-zinc-400 hover:text-purple-400 active:scale-90 transition-all">
+            <LogOut className="w-6 h-6" />
+          </button>
+          <button onClick={handleShare} className="h-12 px-4 rounded-2xl border border-purple-500/30 bg-purple-600/10 flex items-center gap-2 text-xs font-black uppercase text-purple-400 active:scale-95 transition-all">
+            {copied ? <Check className="w-4 h-4 text-green-500" /> : <Share2 className="w-4 h-4" />} 
+            <span className="hidden sm:inline">{copied ? "Copied" : "Invite"}</span>
+          </button>
+        </div>
       </header>
 
       {/* CHAT AREA */}
@@ -221,7 +241,24 @@ const handleShare = async () => {
                 <div className={`group relative flex items-center gap-2 max-w-[90%] ${isMe ? "flex-row-reverse" : ""}`}>
                   <div className={`px-4 py-2.5 rounded-2xl text-[15px] shadow-lg ${isMe ? "bg-purple-600 text-white rounded-tr-none" : "bg-zinc-900 border border-purple-500/5 text-zinc-200 rounded-tl-none"}`}>
                     {msg.reply_metadata && <div className="mb-2 p-2 rounded-lg bg-black/20 border-l-2 border-white/20 text-[11px] opacity-60 italic truncate">{msg.reply_metadata.content}</div>}
-                    {isAudioUrl(msg.content) ? <audio controls className="h-8 w-48 invert brightness-90 opacity-70"><source src={msg.content} /></audio> : <div className="whitespace-pre-wrap break-words leading-snug">{msg.content}</div>}
+                    
+                    {/* FIXED IMAGE RENDERING BLOCK */}
+                    {msg.is_image ? (
+                      msg.content ? (
+                        <ImageMessage msg={msg} />
+                      ) : (
+                        <div className="text-xs text-red-400">Image unavailable</div>
+                      )
+                    ) : isAudioUrl(msg.content) ? (
+                      <audio controls className="h-8 w-48 invert brightness-90 opacity-70">
+                        <source src={msg.content} />
+                      </audio>
+                    ) : (
+                      <div className="whitespace-pre-wrap break-words leading-snug">
+                        {msg.content}
+                      </div>
+                    )}
+                    
                   </div>
                   <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-all">
                     <button onClick={() => setReplyTo(msg)} className="p-1 text-zinc-600 hover:text-white"><Reply className="w-4 h-4" /></button>
@@ -263,7 +300,51 @@ const handleShare = async () => {
               className="flex-1 bg-transparent border-none outline-none text-[16px] py-3 px-4 resize-none max-h-32 placeholder:text-zinc-700 no-scrollbar"
             />
             <div className="flex items-center gap-2 pr-1 pb-1">
-              {/* VOICE RECORDER RESTORED */}
+              <label className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl cursor-pointer">
+                📎
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    e.target.value = ""; // reset input
+
+                    const fileName = `${Date.now()}-${crypto.randomUUID()}-${file.name}`;
+
+                    const { error } = await supabase.storage
+                      .from("chat-images")
+                      .upload(fileName, file);
+
+                    if (error) {
+                      console.error("UPLOAD ERROR:", error);
+                      return;
+                    }
+
+                    const { data } = supabase.storage
+                      .from("chat-images")
+                      .getPublicUrl(fileName);
+
+                    // ... after getting data.publicUrl ...
+
+const { error: dbError } = await supabase.from("messages").insert([{
+  room_id: roomid,
+  nickname: nickname,
+  content: data.publicUrl,
+  is_image: true,
+  created_at: new Date().toISOString(),
+  expires_at: new Date(Date.now() + 30000).toISOString()
+}]);
+
+if (dbError) {
+  console.error("DATABASE INSERT ERROR:", dbError);
+}
+                  }}
+                />
+              </label>
+
               <VoiceRecorder onUploadComplete={async (url) => {
                 await supabase.from("messages").insert([{ room_id: roomid, nickname, content: url, reactions: {}, reply_metadata: replyTo }]);
                 setReplyTo(null);
@@ -274,5 +355,67 @@ const handleShare = async () => {
         </div>
       </div>
     </div>
+  );
+}
+
+// FIXED: Moved outside to prevent remounting, added onClick logic to unblur!
+function ImageMessage({ msg }: any) {
+  const [opened, setOpened] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [destroyed, setDestroyed] = useState(false);
+  
+  useEffect(() => {
+    const created = new Date(msg.created_at).getTime();
+
+    const interval = setInterval(() => {
+      const remaining = 30 - Math.floor((Date.now() - created) / 1000);
+      setTimeLeft(remaining > 0 ? remaining : 0);
+
+      if (remaining <= 0) {
+        setDestroyed(true);
+        clearInterval(interval);
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [msg.created_at]);
+
+  if (destroyed) {
+    return (
+      <motion.div
+        initial={{ scale: 1, opacity: 1 }}
+        animate={{ scale: 0.4, opacity: 0 }}
+        className="text-xs text-red-500"
+      >
+        💣 Image destroyed
+      </motion.div>
+    );
+  }
+
+  return (
+    <div 
+      className="relative max-w-xs group cursor-pointer"
+      onClick={() => setOpened(true)}
+    >
+      <img
+        src={msg.content}
+        onError={(e) => {
+          console.error("Failed to load image:", msg.content);
+          // Removed `display: none` so you can actually see if the image link is broken
+        }}
+        loading="lazy"
+        className={`rounded-xl transition-all duration-300 ${opened ? "blur-none" : "blur-2xl"}`}
+      />
+
+      {!opened && (
+        <div className="absolute inset-0 flex items-center justify-center text-xs font-bold bg-black/60 rounded-xl pointer-events-none text-white">
+          Tap to view
+        </div>
+      )}
+
+      <div className="absolute bottom-1 right-2 text-[10px] bg-black/60 px-2 py-1 rounded-lg text-white">
+        ⏳ {timeLeft}s
+      </div>
+    </div> 
   );
 }
