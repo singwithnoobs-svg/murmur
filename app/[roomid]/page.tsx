@@ -71,17 +71,22 @@ export default function ChatRoom() {
 
   console.log("👥 Presence state:", state);
 
-  const users = Object.keys(state);
+  let uniqueUsers = new Map();
 
-  setOnlineCount(users.length);
-
-  const typing = users.filter((user) => {
-    const metas = state[user];
-    return metas?.some((m: any) => m.isTyping);
+  Object.values(state).forEach((connections: any) => {
+    connections.forEach((meta: any) => {
+      uniqueUsers.set(meta.fp, meta);
+    });
   });
 
+  setOnlineCount(uniqueUsers.size);
+
+  const typing = Array.from(uniqueUsers.values())
+    .filter((u: any) => u.isTyping)
+    .map((u: any) => u.nickname);
+
   setTypingUsers(typing.filter(u => u !== nickname));
-})
+});
         .on("postgres_changes" as any, { event: "*", schema: "public", table: "messages", filter: `room_id=eq.${roomid}` }, (event: any) => {
           if (event.eventType === "INSERT") setMessages((prev) => [...prev, event.new]);
           if (event.eventType === "UPDATE") setMessages((prev) => prev.map(m => m.id === event.new.id ? event.new : m));
