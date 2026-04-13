@@ -1,11 +1,12 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import TermsModal from "@/components/TermsModal";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], display: "swap" });
 
-/* ---------------- SEO & GOOGLE PREVIEW ---------------- */
+/* ---------------- METADATA ---------------- */
+
 export const metadata: Metadata = {
   title: {
     default: "Murmurz | Anonymous Chat, Random Chat & Private Chat Rooms",
@@ -13,48 +14,32 @@ export const metadata: Metadata = {
   },
 
   description:
-    "Murmurz is a fully anonymous chat platform with no accounts and no logs. Chat privately with friends, join public chat rooms, find random matches, create polls, vote instantly, and delete messages for both users. Pure anonymity, real-time communication, zero trace.",
+    "Murmurz is a fully anonymous chat platform with no accounts and no logs. Chat privately, join public rooms, find random matches, create polls, and send disappearing messages.",
 
   keywords: [
     "anonymous chat",
-    "anonymous chatting platform",
-    "anonymous messaging",
-    "anonymous chat website",
-    "anonymous chat app",
-    "no registration chat",
-    "no sign up chat",
-    "no logs chat",
-    "private anonymous chat",
-    "secure anonymous chat",
-
     "random chat",
-    "random anonymous chat",
-    "chat with strangers anonymously",
-    "public chat",
-    "public chat rooms",
-    "global chat room",
-
-    "delete messages for both users",
+    "chat without login",
+    "anonymous messaging",
+    "private chat rooms",
+    "chat with strangers",
     "ephemeral chat",
-    "vanishing messages",
-
     "anonymous polls",
-    "create polls anonymously",
-    "vote anonymously",
-
     "murmurz",
-    "murmurz anonymous chat",
-    "murmurz chat platform",
   ],
 
   authors: [{ name: "Murmurz Team" }],
   creator: "Murmurz",
   metadataBase: new URL("https://murmurz.org"),
 
+  alternates: {
+    canonical: "/",
+  },
+
   openGraph: {
-    title: "Murmurz | Anonymous Chat Without Accounts or Logs",
+    title: "Murmurz | Anonymous Chat Without Accounts",
     description:
-      "Chat anonymously with strangers or friends. Public rooms, private chats, random matching, polls, and messages that disappear for everyone.",
+      "Chat anonymously with strangers or friends. No login, no logs, instant messaging.",
     url: "https://murmurz.org",
     siteName: "Murmurz",
     images: [
@@ -73,7 +58,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Murmurz | Anonymous Chat Platform",
     description:
-      "Instant anonymous chat with random matches, public rooms, private messaging, polls, and disappearing messages.",
+      "Instant anonymous chat with random matches, public rooms, and disappearing messages.",
     images: ["/og-preview.png"],
   },
 
@@ -82,7 +67,18 @@ export const metadata: Metadata = {
     shortcut: "/icon.png",
     apple: "/apple-icon.png",
   },
+
+  category: "technology",
 };
+
+/* ---------------- VIEWPORT (Mobile perfection) ---------------- */
+
+export const viewport: Viewport = {
+  themeColor: "#05010a",
+  colorScheme: "dark",
+};
+
+/* ---------------- ROOT LAYOUT ---------------- */
 
 export default function RootLayout({
   children,
@@ -96,74 +92,70 @@ export default function RootLayout({
       >
         <TermsModal>{children}</TermsModal>
 
-        {/* ================= FAQ SCHEMA (SEO) ================= */}
+        {/* ================= FAQ SCHEMA ================= */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "FAQPage",
-              "mainEntity": [
-                {
-                  "@type": "Question",
-                  "name": "Is Murmurz completely anonymous?",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text":
-                      "Yes. Murmurz does not require accounts, does not collect personal data, and does not store user identities."
-                  }
-                },
-                {
-                  "@type": "Question",
-                  "name": "Can messages be deleted for both users?",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text":
-                      "Yes. When a message is deleted, it is permanently removed for all participants in the chat."
-                  }
-                },
-                {
-                  "@type": "Question",
-                  "name": "Does Murmurz support random anonymous chat?",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text":
-                      "Yes. Murmurz offers instant random matching so users can chat anonymously with strangers."
-                  }
-                },
-                {
-                  "@type": "Question",
-                  "name": "Are there public chat rooms on Murmurz?",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text":
-                      "Yes. Users can join public chat rooms and global channels without creating an account."
-                  }
-                },
-                {
-                  "@type": "Question",
-                  "name": "Can I create polls and vote anonymously?",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text":
-                      "Yes. Murmurz allows users to create polls and vote anonymously inside chats and rooms."
-                  }
-                },
-                {
-                  "@type": "Question",
-                  "name": "Do I need to sign up to use Murmurz?",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text":
-                      "No. Murmurz works without registration, sign-up, or any personal information."
-                  }
-                }
-              ]
-            })
+            __html: JSON.stringify(faqSchema),
           }}
         />
-        {/* =================================================== */}
+
+        {/* ================= WEBSITE SCHEMA ================= */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(siteSchema),
+          }}
+        />
       </body>
     </html>
   );
 }
+
+/* ---------------- SCHEMA OBJECTS ---------------- */
+
+const faqSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    {
+      "@type": "Question",
+      name: "Is Murmurz completely anonymous?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text:
+          "Yes. Murmurz does not require accounts and does not store user identities.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Do I need to sign up?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text:
+          "No. Murmurz works instantly without registration or login.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Can I chat with strangers?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text:
+          "Yes. Murmurz supports random anonymous chat with strangers worldwide.",
+      },
+    },
+  ],
+};
+
+const siteSchema = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "Murmurz",
+  url: "https://murmurz.org",
+  potentialAction: {
+    "@type": "SearchAction",
+    target: "https://murmurz.org/?q={search_term_string}",
+    "query-input": "required name=search_term_string",
+  },
+};
