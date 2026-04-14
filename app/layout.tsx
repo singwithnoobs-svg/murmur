@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import TermsModal from "@/components/TermsModal";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
@@ -17,15 +18,16 @@ export const metadata: Metadata = {
     "Murmurz is a fully anonymous chat platform with no accounts and no logs. Chat privately, join public rooms, find random matches, create polls, and send disappearing messages.",
 
   keywords: [
-    "anonymous chat",
-    "random chat",
-    "chat without login",
-    "anonymous messaging",
-    "private chat rooms",
-    "chat with strangers",
-    "ephemeral chat",
-    "anonymous polls",
-    "murmurz",
+    "anonymous chat online",
+    "chat with strangers no login",
+    "random chat free",
+    "anonymous chat rooms",
+    "talk to strangers anonymously",
+    "no signup chat",
+    "instant chat without account",
+    "secure anonymous messaging",
+    "temporary chat messages",
+    "disappearing chat app",
   ],
 
   authors: [{ name: "Murmurz Team" }],
@@ -34,6 +36,18 @@ export const metadata: Metadata = {
 
   alternates: {
     canonical: "/",
+  },
+
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
 
   openGraph: {
@@ -71,7 +85,7 @@ export const metadata: Metadata = {
   category: "technology",
 };
 
-/* ---------------- VIEWPORT (Mobile perfection) ---------------- */
+/* ---------------- VIEWPORT ---------------- */
 
 export const viewport: Viewport = {
   themeColor: "#05010a",
@@ -92,6 +106,16 @@ export default function RootLayout({
       >
         <TermsModal>{children}</TermsModal>
 
+        {/* ================= SEO CONTENT (helps ranking) ================= */}
+        <section className="hidden">
+          <h1>Anonymous Chat Without Login</h1>
+          <p>
+            Murmurz is a free anonymous chat platform where you can talk to
+            strangers, join private chat rooms, and send disappearing messages
+            instantly without creating an account.
+          </p>
+        </section>
+
         {/* ================= FAQ SCHEMA ================= */}
         <script
           type="application/ld+json"
@@ -107,6 +131,17 @@ export default function RootLayout({
             __html: JSON.stringify(siteSchema),
           }}
         />
+
+        {/* ================= APP SCHEMA ================= */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(appSchema),
+          }}
+        />
+
+        {/* ================= VERCEL ANALYTICS ================= */}
+        <Analytics />
       </body>
     </html>
   );
@@ -157,5 +192,18 @@ const siteSchema = {
     "@type": "SearchAction",
     target: "https://murmurz.org/?q={search_term_string}",
     "query-input": "required name=search_term_string",
+  },
+};
+
+const appSchema = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Murmurz",
+  applicationCategory: "CommunicationApplication",
+  operatingSystem: "Web",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
   },
 };
