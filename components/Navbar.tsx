@@ -5,7 +5,7 @@ import { MessageSquare, Shield } from "lucide-react";
 
 export default function Navbar() {
   return (
-    <nav className="fixed top-0 w-full z-50 border-b border-zinc-900/30 bg-zinc-950/50 backdrop-blur-md">
+    <nav className="fixed top-0 w-full z-50 border-b border-zinc-900/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-4">
         
         {/* Logo Section - Optimized for small widths */}
@@ -15,9 +15,9 @@ export default function Navbar() {
             <MessageSquare className="w-4 h-4 sm:w-5 h-5 text-purple-600 group-hover:scale-110 transition-transform duration-300" />
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="font-black text-lg sm:text-xl tracking-tighter italic leading-none">MURMUR</span>
+            <span className="font-black text-lg sm:text-xl tracking-tighter italic leading-none">MURMURZ</span>
             <span className="text-[7px] sm:text-[8px] text-zinc-700 font-bold tracking-[0.3em] sm:tracking-[0.4em] uppercase truncate">
-              Private Frequency
+              Private Chatting
             </span>
           </div>
         </Link>
