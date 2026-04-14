@@ -75,9 +75,31 @@ export default function ChatRoom() {
           if (event.eventType === "INSERT") setMessages((prev) => [...prev, event.new]);
           if (event.eventType === "UPDATE") setMessages((prev) => prev.map(m => m.id === event.new.id ? event.new : m));
           if (event.eventType === "DELETE") setMessages((prev) => prev.filter(m => m.id !== event.old.id));
-        })
-        .subscribe(async (s: string) => { if (s === "SUBSCRIBED") await channel.track({ isTyping: false, fp: result.visitorId }); });
-    };
+        }) 
+
+        .subscribe(async (status: string) => {
+  if (status === "SUBSCRIBED") {
+    console.log("Realtime connected");
+
+    // Track immediately
+    await channel.track({
+      isTyping: false,
+      fp: result.visitorId,
+      online_at: new Date().toISOString(),
+    });
+  }
+});
+// 🔥 FORCE early tracking (prevents delay issue)
+setTimeout(() => {
+  if (channelRef.current) {
+    channelRef.current.track({
+      isTyping: false,
+      fp: result.visitorId,
+      online_at: new Date().toISOString(),
+    });
+  }
+}, 300);
+            };
     setupChat();
     return () => { if (channelRef.current) supabase.removeChannel(channelRef.current); };
   }, [roomid, nickname]);
