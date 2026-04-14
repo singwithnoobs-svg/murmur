@@ -67,47 +67,16 @@ export default function ChatRoom() {
       channelRef.current = channel;
       channel
         .on("presence", { event: "sync" }, () => {
-  const state = channel.presenceState();
-
-  console.log("👥 Presence state:", state);
-
-  let uniqueUsers = new Map();
-
-  Object.values(state).forEach((connections: any) => {
-    connections.forEach((meta: any) => {
-      uniqueUsers.set(meta.fp, meta);
-    });
-  });
-
-  setOnlineCount(uniqueUsers.size);
-
-  const typing = Array.from(uniqueUsers.values())
-    .filter((u: any) => u.isTyping)
-    .map((u: any) => u.nickname);
-
-  setTypingUsers(typing.filter(u => u !== nickname));
-});
+          const state = channel.presenceState();
+          setOnlineCount(Object.keys(state).length);
+          setTypingUsers(Object.keys(state).filter(k => k !== nickname && (state[k] as any)[0]?.isTyping));
+        })
         .on("postgres_changes" as any, { event: "*", schema: "public", table: "messages", filter: `room_id=eq.${roomid}` }, (event: any) => {
           if (event.eventType === "INSERT") setMessages((prev) => [...prev, event.new]);
           if (event.eventType === "UPDATE") setMessages((prev) => prev.map(m => m.id === event.new.id ? event.new : m));
           if (event.eventType === "DELETE") setMessages((prev) => prev.filter(m => m.id !== event.old.id));
         })
-        .subscribe((status) => {
-  if (status === "SUBSCRIBED") {
-    console.log("✅ Subscribed to room:", roomid);
-
-    channel.track({
-      online_at: new Date().toISOString(),
-      isTyping: false,
-      fp: result.visitorId
-    });
-  }
-});
-
-      setTimeout(() => {
-  const state = channel.presenceState();
-  setOnlineCount(Object.keys(state).length);
-}, 1000);
+        .subscribe(async (s: string) => { if (s === "SUBSCRIBED") await channel.track({ isTyping: false, fp: result.visitorId }); });
     };
     setupChat();
     return () => { if (channelRef.current) supabase.removeChannel(channelRef.current); };
